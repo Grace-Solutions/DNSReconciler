@@ -43,17 +43,21 @@ This makes it ideal for:
 
 | Category | Details |
 |----------|---------|
-| **Multi-provider** | Cloudflare (API v4), Technitium DNS Server, PowerDNS Authoritative. New providers plug into a common `Provider` interface. |
+| **Multi-provider** | Cloudflare (API v4), Technitium DNS Server, PowerDNS Authoritative, AWS Route53, Azure DNS. New providers plug into a common `Provider` interface. Multiple instances of the same provider type are supported. |
 | **Address detection** | Priority-ranked sources: public IPv4/IPv6, RFC 1918, CGNAT/overlay, per-interface with CIDR allow/deny filtering. |
 | **Variable expansion** | 14 variables (`${HOSTNAME}`, `${NODE_ID}`, `${SELECTED_IPV4}`, etc.) expanded in record names, content, comments, and tags. |
-| **Defaults inheritance** | Four-level merge chain: built-in → provider → global → per-record. |
-| **Ownership model** | `perNode`, `singleton`, `manual`, or `disabled` — a node only touches records it owns. |
+| **Instance-based providers** | Providers are configured as an array with UUIDs and friendly names. Records reference providers by ID or name. |
+| **Defaults inheritance** | Three-level merge chain: built-in → provider → per-record. |
+| **Ownership model** | `perNode`, `singleton`, `manual`, or `disabled` — a node only touches records it owns. Default is `perNode`. |
+| **Cloudflare plan detection** | Automatically detects free-plan zones and falls back to comment-based ownership (tags require a paid plan). Cached with 24h TTL. |
+| **Config hot-reload** | Polling-based file watcher detects `config.json` modifications and reloads configuration without restarting the service. |
 | **Idempotent reconciliation** | Fingerprint-based diffing; no changes applied if local state matches desired state. |
 | **Graceful cleanup** | Optional: delete all owned records on `SIGINT`/`SIGTERM` shutdown. |
 | **Jittered scheduler** | Configurable interval with ±10% random jitter to prevent startup stampedes. |
 | **Interval override** | Change the reconcile interval via `-interval` CLI flag or `RECONCILE_INTERVAL_SECONDS` env var without editing config. |
 | **Auto-generated config** | If the config file doesn't exist on first run, a working default is written automatically. |
-| **Service lifecycle** | Idempotent `install`, `remove`, `start`, `stop` via `sc.exe` (Windows), `systemctl` (Linux), `launchctl` (macOS). |
+| **Service lifecycle** | Idempotent `install`, `uninstall`, `start`, `stop`, and `init` (install + start) via `sc.exe` (Windows), `systemctl` (Linux), `launchctl` (macOS). |
+| **Centralized logging** | All HTTP requests, provider operations, plan detection, and config reloads are logged with timing and status information. |
 | **Docker-native** | Multi-stage Alpine build with `PUID`/`PGID` support and auto-permission entrypoint. |
 | **Credential flexibility** | Direct values, `env:VAR_NAME`, or `file:/path/to/secret`. Secrets are never logged. |
 | **Dry-run mode** | Log every planned change without touching the provider API. |
@@ -159,9 +163,10 @@ dnsreconciler service <action> [flags]
 | Action | Description |
 |--------|-------------|
 | `install` | Register as a system service (idempotent) |
-| `remove` | Unregister the system service |
+| `uninstall` | Unregister the system service |
 | `start` | Start the registered service |
 | `stop` | Stop the registered service |
+| `init` | Install and start in one step (idempotent) |
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -185,18 +190,23 @@ A full annotated example is at [`example/config.json`](example/config.json).
 
 ```json
 {
-  "version": 1,
-  "providerDefaults": {
-    "cloudflare": {
-      "apiToken": "env:CF_API_TOKEN",
-      "zoneId": "env:CF_ZONE_ID"
-    }
+  "settings": {
+    "runtime": { "reconcileIntervalSeconds": 120 }
   },
+  "providers": [
+    {
+      "id": "your-uuid-here",
+      "friendlyName": "cloudflare-primary",
+      "type": "cloudflare",
+      "apiToken": "env:CF_API_TOKEN",
+      "zoneId": "env:CF_ZONE_ID",
+      "zone": "example.com"
+    }
+  ],
   "records": [
     {
-      "id": "web",
-      "provider": "cloudflare",
-      "zone": "example.com",
+      "providerId": "cloudflare-primary",
+      "recordId": "your-record-uuid",
       "type": "A",
       "name": "web.example.com",
       "content": "${SELECTED_IPV4}"
@@ -213,39 +223,33 @@ That's it. Everything else has sensible defaults.
 
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
-| `version` | `int` | Yes | Must be `1` |
-| `providerDefaults` | `object` | No | Per-provider credential and URL configuration |
-| `runtime` | `object` | No | Runtime behaviour settings |
-| `network` | `object` | No | Global address source configuration |
-| `defaults` | `object` | No | Default values inherited by all records |
+| `settings` | `object` | No | Runtime and network configuration |
+| `providers` | `array` | Yes | Provider instances with credentials and zone-level defaults |
 | `records` | `array` | Yes | Record templates to reconcile |
 
-#### `providerDefaults.<name>`
+#### `providers[]`
 
-Each provider has its own key under `providerDefaults`.
+Each entry defines a provider instance. Multiple instances of the same type are supported (e.g. two Cloudflare accounts).
 
-**Cloudflare:**
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `id` | `string` | Yes | Unique UUID for this provider instance |
+| `friendlyName` | `string` | No | Human-readable alias (can be used in `providerId`) |
+| `type` | `string` | Yes | `cloudflare`, `technitium`, `powerdns`, `route53`, or `azure` |
+| `enabled` | `bool` | No | Default `true` |
+| `zone` | `string` | No | Default zone inherited by records |
+| `ttl` | `int` | No | Default TTL inherited by records |
+| `proxied` | `bool` | No | Default proxied flag (Cloudflare only) |
+| `comment` | `string` | No | Default comment template (supports variable expansion) |
+| `tags` | `array` | No | Default tag list (supports variable expansion) |
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `apiToken` | Yes | Cloudflare API token (Zone:DNS:Edit permission) |
-| `zoneId` | Yes | Cloudflare zone ID |
-| `baseUrl` | No | API base URL (default: `https://api.cloudflare.com/client/v4`) |
+Provider-specific credential keys are included directly on the provider entry:
 
-**Technitium:**
-
-| Key | Required | Description |
-|-----|----------|-------------|
-| `apiToken` | Yes | Technitium API token |
-| `baseUrl` | Yes | Server URL (e.g. `http://technitium:5380`) |
-
-**PowerDNS:**
-
-| Key | Required | Description |
-|-----|----------|-------------|
-| `apiKey` | Yes | PowerDNS API key |
-| `baseUrl` | Yes | Server URL (e.g. `http://powerdns:8081`) |
-| `serverId` | No | Server ID (default: `localhost`) |
+**Cloudflare:** `apiToken`, `zoneId`, `baseUrl` (optional)
+**Technitium:** `apiToken`, `baseUrl`
+**PowerDNS:** `apiKey`, `baseUrl`, `serverId` (optional, default: `localhost`)
+**Route53:** `accessKeyId`, `secretAccessKey`, `region`, `hostedZoneId`
+**Azure:** `tenantId`, `clientId`, `clientSecret`, `subscriptionId`, `resourceGroup`, `zoneName`
 
 **Credential resolution:**
 
@@ -257,7 +261,7 @@ All credential fields support three syntaxes:
 | `env:` | `"env:CF_API_TOKEN"` | Resolved from environment variable |
 | `file:` | `"file:/run/secrets/cf_token"` | Read from file (trailing newline stripped) |
 
-#### `runtime`
+#### `settings.runtime`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -267,7 +271,7 @@ All credential fields support three syntaxes:
 | `logLevel` | `string` | `Information` | One of: `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical` |
 | `dryRun` | `bool` | `false` | Log planned changes without applying them |
 
-#### `network.addressSources`
+#### `settings.network.addressSources`
 
 An ordered list of address sources. Each source has a priority (1 = highest) and the first source that returns a valid address wins.
 
@@ -294,33 +298,22 @@ An ordered list of address sources. Each source has a priority (1 = highest) and
 | `interfaceIPv6` | IPv6 from a specific named interface |
 | `explicit` | Hard-coded value from `explicitValue` field |
 
-#### `defaults`
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `enabled` | `bool` | `true` | Whether records are active by default |
-| `ownership` | `string` | `perNode` | `perNode`, `singleton`, `manual`, `disabled` |
-| `ttl` | `int` | `120` | DNS TTL in seconds |
-| `proxied` | `bool` | `false` | Cloudflare proxy toggle |
-| `comment` | `string` | `""` | Comment template (supports variable expansion) |
-| `tags` | `array` | `[]` | Tag list (supports variable expansion in values) |
-
 #### `records[]`
 
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
-| `id` | `string` | Yes | Unique identifier for this record template |
-| `enabled` | `bool` | No | Override `defaults.enabled` |
-| `provider` | `string` | Yes | `cloudflare`, `technitium`, or `powerdns` |
-| `zone` | `string` | Yes | DNS zone name |
+| `providerId` | `string` | Yes | References a provider by `id` or `friendlyName` |
+| `recordId` | `string` | Yes | Unique UUID for this record template |
+| `enabled` | `bool` | No | Default `true` |
 | `type` | `string` | Yes | `A` or `AAAA` |
 | `name` | `string` | Yes | FQDN (supports variable expansion) |
 | `content` | `string` | Yes | Record value (supports variable expansion) |
-| `ttl` | `int` | No | Override `defaults.ttl` |
-| `proxied` | `bool` | No | Override `defaults.proxied` |
-| `ownership` | `string` | No | Override `defaults.ownership` |
-| `comment` | `string` | No | Override `defaults.comment` |
-| `tags` | `array` | No | Override `defaults.tags` |
+| `zone` | `string` | No | DNS zone (inherited from provider if not set) |
+| `ttl` | `int` | No | Override provider TTL |
+| `proxied` | `bool` | No | Override provider proxied flag |
+| `ownership` | `string` | No | `perNode` (default), `singleton`, `manual`, `disabled` |
+| `comment` | `string` | No | Override provider comment |
+| `tags` | `array` | No | Override provider tags |
 | `ipFamily` | `string` | No | `ipv4`, `ipv6`, or `dual` |
 | `addressSelection` | `object` | No | Per-record address source override |
 | `matchLabels` | `object` | No | Key/value labels for record matching |
@@ -377,9 +370,8 @@ By default, all records use `network.addressSources`. A record can override this
 
 ```json
 {
-  "id": "mesh-node",
-  "provider": "powerdns",
-  "zone": "mesh.internal",
+  "providerId": "powerdns-mesh",
+  "recordId": "mesh-node-uuid",
   "type": "A",
   "name": "${HOSTNAME}.mesh.internal",
   "content": "${SELECTED_IPV4}",
@@ -523,17 +515,19 @@ The binary can register itself as a background service on Windows, Linux, and ma
 All operations are idempotent — running `install` twice is safe.
 
 ```bash
-# Register and start
+# Install and start in one step (idempotent)
+dnsreconciler service init
+
+# Or separately
 dnsreconciler service install
 dnsreconciler service start
 
 # Stop and unregister
 dnsreconciler service stop
-dnsreconciler service remove
+dnsreconciler service uninstall
 
 # Use a custom service name
-dnsreconciler service install -name my-dns-agent
-dnsreconciler service start -name my-dns-agent
+dnsreconciler service init -name my-dns-agent
 ```
 
 ---
@@ -542,17 +536,18 @@ dnsreconciler service start -name my-dns-agent
 
 Each cycle follows these steps:
 
-1. **Load config** — read and validate `config.json` (auto-create if missing).
-2. **Resolve runtime context** — detect hostname, OS, architecture, and all network interface addresses.
-3. **Merge defaults** — apply the four-level inheritance chain (built-in → provider → global → per-record).
-4. **Select addresses** — for each record, walk the priority-sorted source list and pick the winning address.
-5. **Expand variables** — replace `${VAR}` placeholders in all string fields.
-6. **Compute fingerprints** — hash the desired state for each record.
-7. **Diff against provider** — query the DNS provider API for existing records.
-8. **Apply changes** — create, update, or delete records as needed (skip if fingerprint matches).
-9. **Persist state** — save updated fingerprints and metadata to the state file.
+1. **Load config** — read and validate `config.json` (auto-create if missing). In continuous mode, a file watcher detects modifications and hot-reloads the config.
+2. **Refresh capabilities** — providers that implement `CapabilityRefresher` (e.g. Cloudflare plan detection) are checked for staleness.
+3. **Resolve runtime context** — detect hostname, OS, architecture, and all network interface addresses.
+4. **Merge defaults** — apply the three-level inheritance chain (built-in → provider → per-record).
+5. **Select addresses** — for each record, walk the priority-sorted source list and pick the winning address.
+6. **Expand variables** — replace `${VAR}` placeholders in all string fields.
+7. **Compute fingerprints** — hash the desired state for each record.
+8. **Diff against provider** — query the DNS provider API for existing records.
+9. **Apply changes** — create, update, or delete records as needed (skip if fingerprint matches).
+10. **Persist state** — save updated fingerprints and metadata to the state file.
 
-In `--once` mode, a single cycle runs and the process exits. In continuous mode, the scheduler repeats the cycle on the configured interval with jitter.
+In `--once` mode, a single cycle runs and the process exits. In continuous mode, the scheduler repeats the cycle on the configured interval with jitter. Config changes are detected automatically and applied before the next pass.
 
 ### Ownership model
 
@@ -624,13 +619,16 @@ docker compose build
 ├── docs/
 │   ├── CHANGELOG.md
 │   └── DesignSpecification.md     # Full design specification
-├── example/
-│   └── config.json                # Annotated sample configuration
+├── example/                       # Sample configuration files
+│   ├── config.json                # Multi-provider example
+│   ├── config.cloudflare.json
+│   ├── config.technitium.json
+│   ├── config.powerdns.json
+│   ├── config.route53.json
+│   └── config.azure.json
 ├── iac/
 │   └── docker/
 │       ├── .env.example           # Non-secret environment template
-│       ├── config/                # Bind-mounted config directory
-│       │   └── config.json
 │       ├── secrets/               # Docker secrets (gitignored)
 │       ├── state/                 # Bind-mounted state directory
 │       ├── docker-compose.yml
@@ -642,21 +640,24 @@ docker compose build
 │   ├── go.mod
 │   └── internal/
 │       ├── address/               # Priority-based address resolver
-│       ├── app/                   # Application wiring, CLI parsing
+│       ├── app/                   # Application wiring, CLI parsing, config hot-reload
 │       ├── cleanup/               # Graceful shutdown record cleanup
 │       ├── config/                # Config loading, validation, defaults, auto-generation
-│       ├── core/                  # Domain types and Provider interface
+│       ├── core/                  # Domain types, Provider interface, CapabilityRefresher
 │       ├── expansion/             # ${VAR} expansion engine
 │       ├── logging/               # Centralized structured logger
 │       ├── provider/              # Provider registry, credential resolver, HTTP client
-│       │   ├── cloudflare/        # Cloudflare API v4 implementation
+│       │   ├── azure/             # Azure DNS implementation
+│       │   ├── cloudflare/        # Cloudflare API v4 with plan detection
 │       │   ├── powerdns/          # PowerDNS Authoritative implementation
+│       │   ├── route53/           # AWS Route53 with SigV4 authentication
 │       │   └── technitium/        # Technitium DNS Server implementation
 │       ├── reconcile/             # Reconciliation pipeline
 │       ├── runtimectx/            # Host runtime context resolver
 │       ├── scheduler/             # Jittered interval scheduler
 │       ├── service/               # Platform service managers (Windows/Linux/macOS)
-│       └── state/                 # Local state persistence (JSON)
+│       ├── state/                 # Local state persistence (JSON)
+│       └── watcher/               # Polling-based config file watcher
 └── README.md
 ```
 

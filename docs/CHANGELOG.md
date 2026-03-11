@@ -9,12 +9,12 @@
 - **Runtime context resolver** — Hostname, stable node ID (machine UUID → hostname fallback), OS/arch detection, public IP resolution via multiple upstream services.
 - **Address selection engine** — Priority-based address resolution with CIDR allow/deny filtering and per-record overrides. Supports `publicIPv4`, `publicIPv6`, `rfc1918IPv4`, `cgnatIPv4`, `interfaceIPv4/v6`, and `explicitIPv4/v6` source types.
 - **Variable expansion engine** — 14 built-in variables (`${HOSTNAME}`, `${NODE_ID}`, `${SELECTED_IPV4}`, `${PUBLIC_IPV4}`, `${OS}`, etc.) expanded in record names, content, comments, and tags.
-- **Defaults merging** — Built-in → provider → global → per-record inheritance chain.
+- **Defaults merging** — Built-in → provider → per-record inheritance chain (three levels).
 - **Reconciliation pipeline** — Full startup flow and per-record reconciliation with fingerprint-based drift detection and state persistence.
 
 ### Providers
 
-- **Cloudflare** — API v4 with structured tags, comments, proxied flag support.
+- **Cloudflare** — API v4 with structured tags, comments, proxied flag support. Automatic plan detection (free plan falls back to comment-based ownership). Plan status cached with 24h TTL via `CapabilityRefresher` interface.
 - **Technitium** — DNS Server API with comment-based ownership.
 - **PowerDNS** — Authoritative Server API with RRset operations and comment-based ownership.
 - **AWS Route53** — XML API with manual AWS Signature V4 authentication (zero external dependencies). State-file ownership.
@@ -24,19 +24,26 @@
 
 - **Scheduler** — Interval-based reconciliation loop with jitter, IP-change trigger, and signal-driven shutdown. Supports `--once` flag for single-pass mode.
 - **Cleanup on shutdown** — Graceful shutdown deletes owned records when `cleanupOnShutdown` is enabled.
-- **Service lifecycle managers** — Platform-specific service install/remove/start/stop for systemd (Linux), Windows Services (sc.exe), and launchd (macOS).
+- **Service lifecycle managers** — Platform-specific service `install`, `uninstall`, `start`, `stop`, and `init` (install + start) for systemd (Linux), Windows Services (sc.exe), and launchd (macOS). All operations are idempotent.
 - **Cross-platform binaries** — `CGO_ENABLED=0` static builds for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64 published in `Binaries/`.
+- **Config hot-reload** — Polling-based file watcher (5s interval) detects `config.json` modifications. Configuration and providers are atomically swapped via `runState` struct with `sync.RWMutex`. Invalid configs are logged and skipped — the previous valid config continues running.
+- **Centralized HTTP logging** — `APIClient` logs every HTTP request/response at `Debug` level with method, path, status code, and duration. Azure and Route53 custom HTTP methods log identically. Non-2xx responses log at `Warning` level.
+- **Provider operation logging** — All provider CRUD operations (`ListRecords`, `CreateRecord`, `UpdateRecord`, `DeleteRecord`) log at `Information` level with record type, name, and content details. `ListRecords` logs at `Debug` level with result counts and filter parameters.
 
 ### Docker
 
 - **Dockerfile** — Multi-stage Go build producing a minimal container.
 - **docker-compose.yml** — Environment variable injection for credentials with commented-out Docker secrets pattern. Directory bind mounts for `/config` and `/state`. `restart: unless-stopped` as the service manager.
 - **PUID/PGID support** — Entrypoint script with `su-exec` for user/group mapping.
-- **Per-provider example configs** — Standalone config files for each provider (`config.cloudflare.json`, `config.technitium.json`, `config.powerdns.json`, `config.route53.json`, `config.azure.json`).
+- **Per-provider example configs** — Standalone config files for each provider (`config.cloudflare.json`, `config.technitium.json`, `config.powerdns.json`, `config.route53.json`, `config.azure.json`) in the `example/` directory.
 
 ### Configuration
 
-- **Auto-generated default config** — When no config file exists, a valid default is written to disk as a starting template.
+- **Instance-based provider model** — Providers are configured as an array with UUIDs and friendly names. Records reference providers by `providerId` (ID or friendly name). Multiple instances of the same provider type are supported.
+- **Flattened provider defaults** — TTL, proxied, comment, tags, and zone live directly on the provider entry — no nested `defaults` wrapper.
+- **Record identifiers** — Records use `recordId` (UUID) instead of `id`. Field order: `providerId`, `recordId`, `enabled`, `type`, `name`, `content`.
+- **Implicit ownership** — Default ownership model is `perNode`. The `ownership` field is removed from provider level; per-record override is still available.
+- **Zone inheritance** — Records inherit `zone` from their provider when not set explicitly.
+- **Auto-generated default config** — When no config file exists, a valid default with Cloudflare provider and sample records is written to disk.
 - **Interval override** — Reconcile interval configurable via `-interval` CLI flag or `RECONCILE_INTERVAL_SECONDS` environment variable (CLI > env > config file).
 - **Credential resolution** — `env:VAR_NAME`, `file:/path`, or direct values supported in all provider credential fields.
-- **Disabled AAAA records** — Each example config includes a disabled IPv6 record template ready to enable.
