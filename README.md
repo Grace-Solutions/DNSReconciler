@@ -72,15 +72,15 @@ Pick your platform, run the commands, edit the config, and go.
 The base URL for all downloads is:
 
 ```
-https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main
+https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main
 ```
 
 ### Linux (x86_64)
 
 ```bash
 mkdir -p DNSReconciler && cd DNSReconciler
-curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-linux-amd64
-curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json -o config.json
+curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/Binaries/dnsreconciler-linux-amd64
+curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/example/config.cloudflare.json -o config.json
 chmod +x dnsreconciler-linux-amd64
 # Edit config.json — set your API token, zone ID, zone name, and record names
 ./dnsreconciler-linux-amd64 -config ./config.json --once
@@ -90,8 +90,8 @@ chmod +x dnsreconciler-linux-amd64
 
 ```bash
 mkdir -p DNSReconciler && cd DNSReconciler
-curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-linux-arm64
-curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json -o config.json
+curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/Binaries/dnsreconciler-linux-arm64
+curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/example/config.cloudflare.json -o config.json
 chmod +x dnsreconciler-linux-arm64
 # Edit config.json — set your API token, zone ID, zone name, and record names
 ./dnsreconciler-linux-arm64 -config ./config.json --once
@@ -101,8 +101,8 @@ chmod +x dnsreconciler-linux-arm64
 
 ```bash
 mkdir -p DNSReconciler && cd DNSReconciler
-curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-darwin-arm64
-curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json -o config.json
+curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/Binaries/dnsreconciler-darwin-arm64
+curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/example/config.cloudflare.json -o config.json
 chmod +x dnsreconciler-darwin-arm64
 # Edit config.json — set your API token, zone ID, zone name, and record names
 ./dnsreconciler-darwin-arm64 -config ./config.json --once
@@ -112,8 +112,8 @@ chmod +x dnsreconciler-darwin-arm64
 
 ```bash
 mkdir -p DNSReconciler && cd DNSReconciler
-curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-darwin-amd64
-curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json -o config.json
+curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/Binaries/dnsreconciler-darwin-amd64
+curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/example/config.cloudflare.json -o config.json
 chmod +x dnsreconciler-darwin-amd64
 # Edit config.json — set your API token, zone ID, zone name, and record names
 ./dnsreconciler-darwin-amd64 -config ./config.json --once
@@ -124,8 +124,8 @@ chmod +x dnsreconciler-darwin-amd64
 ```powershell
 New-Item -ItemType Directory -Force -Path DNSReconciler | Set-Location
 $wc = New-Object System.Net.WebClient
-$wc.DownloadFile("https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-windows-amd64.exe", "$PWD\dnsreconciler.exe")
-$wc.DownloadFile("https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json", "$PWD\config.json")
+$wc.DownloadFile("https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/Binaries/dnsreconciler-windows-amd64.exe", "$PWD\dnsreconciler.exe")
+$wc.DownloadFile("https://raw.githubusercontent.com/Grace-Solutions/DNSReconciler/main/example/config.cloudflare.json", "$PWD\config.json")
 # Edit config.json — set your API token, zone ID, zone name, and record names
 .\dnsreconciler.exe -config .\config.json --once
 ```
