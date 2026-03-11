@@ -17,7 +17,7 @@
 
     "providers": [
         {
-            "id":           "f86e9515-aea4-475b-bda4-343bb8edc41f",
+            "providerId":   "f86e9515-aea4-475b-bda4-343bb8edc41f",
             "friendlyName": "cloudflare-primary",
             "type":         "cloudflare",
             "enabled":      true,
@@ -35,7 +35,7 @@
             ]
         },
         {
-            "id":           "93a1236f-bcf1-438c-8283-ad4dd57a3171",
+            "providerId":   "93a1236f-bcf1-438c-8283-ad4dd57a3171",
             "friendlyName": "powerdns-mesh",
             "type":         "powerdns",
             "enabled":      true,
@@ -47,7 +47,7 @@
             "comment":      "Managed by dnsreconciler on ${HOSTNAME}"
         },
         {
-            "id":           "b5e82b02-32ba-48f7-b575-3a01940e7056",
+            "providerId":   "b5e82b02-32ba-48f7-b575-3a01940e7056",
             "friendlyName": "technitium-local",
             "type":         "technitium",
             "enabled":      true,
@@ -61,7 +61,7 @@
 
     "records": [
         {
-            "providerId": "cloudflare-primary",
+            "providerId": "f86e9515-aea4-475b-bda4-343bb8edc41f",
             "recordId":   "04399d6f-36fb-4659-9dd4-dd67cfe86a72",
             "enabled":    true,
             "type":       "A",
@@ -72,7 +72,7 @@
             ]
         },
         {
-            "providerId": "powerdns-mesh",
+            "providerId": "93a1236f-bcf1-438c-8283-ad4dd57a3171",
             "recordId":   "ef3b8299-a4f6-42e1-ba06-105a7fb1ebf9",
             "enabled":    true,
             "type":       "A",
@@ -97,7 +97,7 @@
             }
         },
         {
-            "providerId": "technitium-local",
+            "providerId": "b5e82b02-32ba-48f7-b575-3a01940e7056",
             "recordId":   "a1c7d3e5-9f82-4b16-8e4a-7c3d5f9a2b18",
             "enabled":    true,
             "type":       "A",

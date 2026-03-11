@@ -28,7 +28,7 @@ const defaultConfigJSON = `{
 
     "providers": [
         {
-            "id":           "535c8629-764e-456b-9946-0bce7ea1e739",
+            "providerId":   "535c8629-764e-456b-9946-0bce7ea1e739",
             "friendlyName": "cloudflare-primary",
             "type":         "cloudflare",
             "enabled":      true,
@@ -43,7 +43,7 @@ const defaultConfigJSON = `{
 
     "records": [
         {
-            "providerId": "cloudflare-primary",
+            "providerId": "535c8629-764e-456b-9946-0bce7ea1e739",
             "recordId":   "02275d10-d877-486c-9773-346555c1964a",
             "enabled":    true,
             "type":       "A",

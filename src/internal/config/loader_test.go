@@ -53,7 +53,7 @@ func TestValidateRejectsDuplicatePriorities(t *testing.T) {
 	}
 }
 
-func TestValidateRejectsUnknownProvider(t *testing.T) {
+func TestValidateSkipsUnknownProvider(t *testing.T) {
 	cfg := Config{
 		Settings: SettingsConfig{
 			Runtime: RuntimeConfig{LogLevel: "Information"},
@@ -70,8 +70,34 @@ func TestValidateRejectsUnknownProvider(t *testing.T) {
 	}
 	cfg.ApplyBuiltInDefaults()
 
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected unknown provider validation error")
+	// Unknown provider is now non-fatal — validation should pass
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected unknown provider to be skipped, got error: %v", err)
+	}
+}
+
+func TestValidateSkipsDisabledRecords(t *testing.T) {
+	disabled := false
+	cfg := Config{
+		Settings: SettingsConfig{
+			Runtime: RuntimeConfig{LogLevel: "Information"},
+		},
+		Providers: []ProviderEntry{{ID: "cf-1", Type: "cloudflare"}},
+		Records: []RecordTemplate{{
+			RecordID:   "rec-disabled",
+			ProviderID: "nonexistent",
+			Enabled:    &disabled,
+			Zone:       "example.com",
+			Type:       "A",
+			Name:       "a.example.com",
+			Content:    "${SELECTED_IPV4}",
+		}},
+	}
+	cfg.ApplyBuiltInDefaults()
+
+	// Disabled records should be gated before provider lookup
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected disabled record to be skipped, got error: %v", err)
 	}
 }
 

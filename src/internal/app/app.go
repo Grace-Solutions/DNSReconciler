@@ -307,10 +307,6 @@ func (a Application) buildProviderMap(cfg config.Config) map[string]core.Provide
 			continue
 		}
 		providers[entry.ID] = p
-		// Also register by friendly name for lookup convenience
-		if entry.FriendlyName != "" {
-			providers[entry.FriendlyName] = p
-		}
 		label := entry.ID
 		if entry.FriendlyName != "" {
 			label = entry.FriendlyName + " (" + entry.ID + ")"

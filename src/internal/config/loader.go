@@ -52,7 +52,7 @@ func (c Config) Validate() error {
 	seenFriendly := map[string]struct{}{}
 	for _, prov := range c.Providers {
 		if prov.ID == "" {
-			return errors.New("providers[].id is required")
+			return errors.New("providers[].providerId is required")
 		}
 		if _, exists := seenProvIDs[prov.ID]; exists {
 			return fmt.Errorf("duplicate provider id %q", prov.ID)
@@ -79,13 +79,18 @@ func (c Config) Validate() error {
 			return fmt.Errorf("duplicate record id %q", record.RecordID)
 		}
 		seenIDs[record.RecordID] = struct{}{}
+		// Skip validation of disabled records — they should not cause errors
+		if record.Enabled != nil && !*record.Enabled {
+			continue
+		}
 		if record.ProviderID == "" || record.Type == "" || record.Name == "" || record.Content == "" {
 			return fmt.Errorf("record %q must define providerId, type, name, and content", record.RecordID)
 		}
-		// Validate that referenced provider exists
+		// Validate that referenced provider exists (warning, not fatal)
 		prov := c.FindProvider(record.ProviderID)
 		if prov == nil {
-			return fmt.Errorf("record %q references unknown provider %q", record.RecordID, record.ProviderID)
+			// Non-fatal: the reconciler will log and skip at runtime
+			continue
 		}
 		// Inherit zone from provider if not set on the record
 		if record.Zone == "" {

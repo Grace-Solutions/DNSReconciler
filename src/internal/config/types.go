@@ -40,7 +40,7 @@ type NetworkConfig struct {
 // and Zone live directly on the provider — no nested "defaults" wrapper.
 // RawConfig captures all JSON fields so provider factories can read credentials.
 type ProviderEntry struct {
-	ID           string         `json:"id"`
+	ID           string         `json:"providerId"`
 	FriendlyName string         `json:"friendlyName,omitempty"`
 	Type         string         `json:"type"`
 	Enabled      *bool          `json:"enabled,omitempty"`
@@ -79,7 +79,7 @@ func (p *ProviderEntry) IsEnabled() bool {
 }
 
 // RecordTemplate defines a DNS record to be reconciled.
-// ProviderID links to a ProviderEntry by its ID or FriendlyName.
+// ProviderID links to a ProviderEntry by its UUID (providerId).
 // Zone is optional — inherited from the provider if not set.
 type RecordTemplate struct {
 	ProviderID       string            `json:"providerId"`
@@ -120,11 +120,12 @@ type Tag struct {
 	Value string `json:"value"`
 }
 
-// FindProvider looks up a provider entry by ID or FriendlyName.
+// FindProvider looks up a provider entry by its UUID (providerId).
+// The friendlyName is for display only and is not used for lookup.
 // Returns nil if not found.
-func (c *Config) FindProvider(idOrName string) *ProviderEntry {
+func (c *Config) FindProvider(id string) *ProviderEntry {
 	for i := range c.Providers {
-		if c.Providers[i].ID == idOrName || c.Providers[i].FriendlyName == idOrName {
+		if c.Providers[i].ID == id {
 			return &c.Providers[i]
 		}
 	}
