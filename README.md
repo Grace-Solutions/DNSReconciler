@@ -67,26 +67,70 @@ This makes it ideal for:
 
 ## Quick start
 
-### Option A — Download a binary
+Pick your platform, run the commands, edit the config, and go.
 
-Grab the appropriate binary from the [`Binaries/`](Binaries/) directory:
+The base URL for all downloads is:
 
-| Platform | Binary |
-|----------|--------|
-| Linux x86_64 | `dnsreconciler-linux-amd64` |
-| Linux ARM64 | `dnsreconciler-linux-arm64` |
-| macOS Intel | `dnsreconciler-darwin-amd64` |
-| macOS Apple Silicon | `dnsreconciler-darwin-arm64` |
-| Windows x86_64 | `dnsreconciler-windows-amd64.exe` |
+```
+https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main
+```
+
+### Linux (x86_64)
 
 ```bash
+mkdir -p DNSReconciler && cd DNSReconciler
+curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-linux-amd64
+curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json -o config.json
 chmod +x dnsreconciler-linux-amd64
+# Edit config.json — set your API token, zone ID, zone name, and record names
 ./dnsreconciler-linux-amd64 -config ./config.json --once
 ```
 
-> **First run?** If `config.json` doesn't exist, a default config is created automatically. Edit it, then run again.
+### Linux (ARM64)
 
-### Option B — Docker
+```bash
+mkdir -p DNSReconciler && cd DNSReconciler
+curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-linux-arm64
+curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json -o config.json
+chmod +x dnsreconciler-linux-arm64
+# Edit config.json — set your API token, zone ID, zone name, and record names
+./dnsreconciler-linux-arm64 -config ./config.json --once
+```
+
+### macOS (Apple Silicon)
+
+```bash
+mkdir -p DNSReconciler && cd DNSReconciler
+curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-darwin-arm64
+curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json -o config.json
+chmod +x dnsreconciler-darwin-arm64
+# Edit config.json — set your API token, zone ID, zone name, and record names
+./dnsreconciler-darwin-arm64 -config ./config.json --once
+```
+
+### macOS (Intel)
+
+```bash
+mkdir -p DNSReconciler && cd DNSReconciler
+curl -LO https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-darwin-amd64
+curl -L  https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json -o config.json
+chmod +x dnsreconciler-darwin-amd64
+# Edit config.json — set your API token, zone ID, zone name, and record names
+./dnsreconciler-darwin-amd64 -config ./config.json --once
+```
+
+### Windows (x86_64)
+
+```powershell
+New-Item -ItemType Directory -Force -Path DNSReconciler | Set-Location
+$wc = New-Object System.Net.WebClient
+$wc.DownloadFile("https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/Binaries/dnsreconciler-windows-amd64.exe", "$PWD\dnsreconciler.exe")
+$wc.DownloadFile("https://raw.githubusercontent.com/Grace-Solutions/DNS-Automatic-Updater/main/example/config.cloudflare.json", "$PWD\config.json")
+# Edit config.json — set your API token, zone ID, zone name, and record names
+.\dnsreconciler.exe -config .\config.json --once
+```
+
+### Docker
 
 ```bash
 cd iac/docker
@@ -95,6 +139,8 @@ mkdir -p config
 # edit config/config.json (or let it auto-generate on first run)
 docker compose up --build
 ```
+
+> **First run?** Edit `config.json` before running — set your provider credentials, zone, and record names. The downloaded config is a Cloudflare template with `env:` references; replace them with your actual values or set the environment variables. See [Configuration](#configuration) for the full schema.
 
 ---
 
