@@ -12,8 +12,9 @@ services:
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
+      - RECONCILE_INTERVAL_SECONDS=${RECONCILE_INTERVAL_SECONDS:-}
     volumes:
-      - ./config.json:/config/config.json:ro
+      - ./config:/config
       - state-data:/state
     # Uncomment to mount file-based secrets instead of using env vars:
     # - /run/secrets:/run/secrets:ro

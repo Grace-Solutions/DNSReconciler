@@ -69,10 +69,21 @@ func (a Application) Run(args []string) error {
 }
 
 func (a Application) run(command Command) error {
+	// Auto-create config if it doesn't exist
+	if _, err := os.Stat(command.ConfigPath); os.IsNotExist(err) {
+		a.logger.Information(fmt.Sprintf("Config file %q not found — generating default config", command.ConfigPath))
+	}
+
 	// §21.1 steps 1-2: load and validate config
 	cfg, err := config.Load(command.ConfigPath)
 	if err != nil {
 		return err
+	}
+
+	// Apply CLI/env interval override before anything reads it
+	if command.OverrideInterval > 0 {
+		a.logger.Information(fmt.Sprintf("Overriding reconcile interval: %ds → %ds", cfg.Runtime.ReconcileIntervalSeconds, command.OverrideInterval))
+		cfg.Runtime.ReconcileIntervalSeconds = command.OverrideInterval
 	}
 
 	// §21.1 step 3: initialize centralized logger

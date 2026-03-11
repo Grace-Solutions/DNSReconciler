@@ -14,7 +14,17 @@ var (
 	errInvalidRecordType  = errors.New("record type must be A or AAAA in v1")
 )
 
+// Load reads and validates the config from path. If the file does not exist a
+// sensible default config is written to that path first so the user has a
+// working starting point.
 func Load(path string) (Config, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if wErr := WriteDefault(path); wErr != nil {
+			return Config{}, fmt.Errorf("auto-create default config: %w", wErr)
+		}
+		// Signal that we created it — caller can log this.
+	}
+
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return Config{}, fmt.Errorf("read config %q: %w", path, err)

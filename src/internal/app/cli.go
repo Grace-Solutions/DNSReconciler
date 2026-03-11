@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 
 	"github.com/gracesolutions/dns-automatic-updater/internal/service"
 )
@@ -18,13 +20,14 @@ const (
 )
 
 type Command struct {
-	Kind          CommandKind
-	ConfigPath    string
-	OverrideState string
-	NodeID        string
-	Once          bool
-	ServiceAction service.Action
-	ServiceName   string
+	Kind             CommandKind
+	ConfigPath       string
+	OverrideState    string
+	NodeID           string
+	Once             bool
+	OverrideInterval int // 0 = not set; positive value overrides config
+	ServiceAction    service.Action
+	ServiceName      string
 }
 
 func Parse(args []string) (Command, error) {
@@ -46,10 +49,29 @@ func parseRun(args []string) (Command, error) {
 	statePath := fs.String("state", "", "Override the configured state file path.")
 	nodeID := fs.String("node-id", "", "Explicit node identity (§11.4).")
 	once := fs.Bool("once", false, "Run a single reconciliation pass and exit (§25).")
+	interval := fs.Int("interval", 0, "Override reconcile interval in seconds.")
 	if err := fs.Parse(args); err != nil {
 		return Command{}, err
 	}
-	return Command{Kind: CommandRun, ConfigPath: *configPath, OverrideState: *statePath, NodeID: *nodeID, Once: *once}, nil
+
+	// Environment variable fallback: RECONCILE_INTERVAL_SECONDS
+	overrideInterval := *interval
+	if overrideInterval == 0 {
+		if envVal := os.Getenv("RECONCILE_INTERVAL_SECONDS"); envVal != "" {
+			if parsed, err := strconv.Atoi(envVal); err == nil && parsed > 0 {
+				overrideInterval = parsed
+			}
+		}
+	}
+
+	return Command{
+		Kind:             CommandRun,
+		ConfigPath:       *configPath,
+		OverrideState:    *statePath,
+		NodeID:           *nodeID,
+		Once:             *once,
+		OverrideInterval: overrideInterval,
+	}, nil
 }
 
 func parseService(args []string) (Command, error) {
