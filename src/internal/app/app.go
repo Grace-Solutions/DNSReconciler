@@ -10,6 +10,10 @@ import (
 	"github.com/gracesolutions/dns-automatic-updater/internal/config"
 	"github.com/gracesolutions/dns-automatic-updater/internal/core"
 	"github.com/gracesolutions/dns-automatic-updater/internal/logging"
+	"github.com/gracesolutions/dns-automatic-updater/internal/provider"
+	"github.com/gracesolutions/dns-automatic-updater/internal/provider/cloudflare"
+	"github.com/gracesolutions/dns-automatic-updater/internal/provider/powerdns"
+	"github.com/gracesolutions/dns-automatic-updater/internal/provider/technitium"
 	"github.com/gracesolutions/dns-automatic-updater/internal/reconcile"
 	"github.com/gracesolutions/dns-automatic-updater/internal/runtimectx"
 	"github.com/gracesolutions/dns-automatic-updater/internal/service"
@@ -125,12 +129,34 @@ func (a Application) run(command Command) error {
 	return nil
 }
 
-// buildProviderMap returns the registered provider map. Provider implementations
-// will be added in subsequent milestones; for now returns an empty map.
+// buildProviderMap creates provider instances from config using the provider registry (§9).
 func (a Application) buildProviderMap(cfg config.Config) map[string]core.Provider {
-	// Placeholder — provider implementations (Cloudflare, Technitium, PowerDNS) will be
-	// registered here once they are built.
-	return map[string]core.Provider{}
+	registry := provider.NewRegistry()
+	registry.Register("cloudflare", cloudflare.New)
+	registry.Register("technitium", technitium.New)
+	registry.Register("powerdns", powerdns.New)
+
+	// Collect unique provider names referenced by records
+	needed := map[string]bool{}
+	for _, rec := range cfg.Records {
+		needed[rec.Provider] = true
+	}
+
+	providers := map[string]core.Provider{}
+	for name := range needed {
+		provCfg := cfg.ProviderDefaults[name]
+		if provCfg == nil {
+			provCfg = map[string]any{}
+		}
+		p, err := registry.Build(name, provCfg, a.logger)
+		if err != nil {
+			a.logger.Error(fmt.Sprintf("Failed to initialize provider %q: %s", name, err))
+			continue
+		}
+		providers[name] = p
+		a.logger.Information(fmt.Sprintf("Provider %q initialized successfully", name))
+	}
+	return providers
 }
 
 func (a Application) handleService(command Command) error {
