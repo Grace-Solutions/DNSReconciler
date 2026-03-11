@@ -433,9 +433,15 @@ All Docker files live in [`iac/docker/`](iac/docker/).
 
 ```
 iac/docker/
-├── .env.example           # Credential and PUID/PGID template
+├── .env.example           # Non-secret environment template
 ├── config/                # Bind-mounted as /config in the container
 │   └── config.json        # Your configuration file
+├── secrets/               # Docker secrets (gitignored except .gitignore)
+│   ├── cf_api_token       # Cloudflare API token
+│   ├── cf_zone_id         # Cloudflare zone ID
+│   ├── tech_api_token     # Technitium API token
+│   └── pdns_api_key       # PowerDNS API key
+├── state/                 # Bind-mounted as /state in the container
 ├── docker-compose.yml     # Service definition
 ├── Dockerfile             # Multi-stage build
 └── entrypoint.sh          # Auto-permission entrypoint
@@ -446,25 +452,49 @@ iac/docker/
 ```bash
 cd iac/docker
 cp .env.example .env
-# Edit .env — set PUID, PGID, and provider credentials
+# Edit .env — set PUID, PGID, and non-secret URLs
+
+# Populate secrets (one credential per file, no trailing newline)
+echo -n "your-cloudflare-token" > secrets/cf_api_token
+echo -n "your-zone-id"         > secrets/cf_zone_id
+echo -n "your-tech-token"      > secrets/tech_api_token
+echo -n "your-pdns-key"        > secrets/pdns_api_key
+
 # Edit config/config.json — or let it auto-generate on first run
 docker compose up --build -d
 ```
 
+> **Docker is the service manager.** The container runs the binary directly in a reconciliation loop — there is no `service install`. The `restart: unless-stopped` policy keeps it running across reboots, effectively acting as the service supervisor.
+
+### Docker secrets
+
+Credentials are managed via native Docker secrets. Each secret is a plain file in `secrets/` that gets mounted read-only at `/run/secrets/<name>` inside the container.
+
+Reference them in `config.json` using the `file:` prefix:
+
+```json
+"apiToken": "file:/run/secrets/cf_api_token"
+```
+
+| Secret file | Used by | Config field |
+|-------------|---------|--------------|
+| `secrets/cf_api_token` | Cloudflare | `providerDefaults.cloudflare.apiToken` |
+| `secrets/cf_zone_id` | Cloudflare | `providerDefaults.cloudflare.zoneId` |
+| `secrets/tech_api_token` | Technitium | `providerDefaults.technitium.apiToken` |
+| `secrets/pdns_api_key` | PowerDNS | `providerDefaults.powerdns.apiKey` |
+
+The `secrets/` directory is gitignored — only the `.gitignore` itself is tracked. Secret files never enter version control.
+
 ### Environment variables
 
-All variables in `.env` are injected into the container and can be referenced in `config.json` using `env:VAR_NAME` syntax.
+Non-secret configuration (URLs, IDs, intervals) is set in `.env` and referenced via `env:VAR_NAME` in `config.json`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PUID` | `1000` | Container user ID — match your host user |
 | `PGID` | `1000` | Container group ID — match your host group |
 | `RECONCILE_INTERVAL_SECONDS` | *(unset)* | Override the config file's interval |
-| `CF_API_TOKEN` | | Cloudflare API token |
-| `CF_ZONE_ID` | | Cloudflare zone ID |
-| `TECH_API_TOKEN` | | Technitium API token |
 | `TECH_BASE_URL` | `http://technitium:5380` | Technitium server URL |
-| `PDNS_API_KEY` | | PowerDNS API key |
 | `PDNS_BASE_URL` | `http://powerdns:8081` | PowerDNS server URL |
 
 ### PUID / PGID
@@ -475,7 +505,7 @@ The container entrypoint runs as root, then:
 2. Runs `chown -R` on `/config` and `/state` to fix ownership.
 3. Drops privileges via `su-exec` — the application runs as PID 1 under the target user with transparent signal handling.
 
-This ensures bind-mounted volumes have correct permissions regardless of the host user.
+This ensures bind-mounted directories have correct permissions regardless of the host user.
 
 ```bash
 # Find your host UID/GID
@@ -487,16 +517,8 @@ id -g    # → 1000
 
 | Container path | Type | Description |
 |----------------|------|-------------|
-| `/config` | Bind mount | Configuration directory (contains `config.json`) |
-| `/state` | Named volume | Persistent state file storage |
-
-### File-based secrets (Docker Swarm / Kubernetes)
-
-Uncomment the secrets volume in `docker-compose.yml` and use `file:` syntax in your config:
-
-```json
-"apiToken": "file:/run/secrets/cf_token"
-```
+| `/config` | Bind mount (`./config`) | Configuration directory (contains `config.json`) |
+| `/state` | Bind mount (`./state`) | State file storage — inspect on host at `iac/docker/state/` |
 
 ---
 
@@ -618,9 +640,11 @@ docker compose build
 │   └── config.json                # Annotated sample configuration
 ├── iac/
 │   └── docker/
-│       ├── .env.example           # Environment template
+│       ├── .env.example           # Non-secret environment template
 │       ├── config/                # Bind-mounted config directory
 │       │   └── config.json
+│       ├── secrets/               # Docker secrets (gitignored)
+│       ├── state/                 # Bind-mounted state directory
 │       ├── docker-compose.yml
 │       ├── Dockerfile
 │       └── entrypoint.sh          # PUID/PGID auto-permission script

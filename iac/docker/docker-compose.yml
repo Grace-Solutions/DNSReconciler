@@ -15,14 +15,27 @@ services:
       - RECONCILE_INTERVAL_SECONDS=${RECONCILE_INTERVAL_SECONDS:-}
     volumes:
       - ./config:/config
-      - state-data:/state
-    # Uncomment to mount file-based secrets instead of using env vars:
-    # - /run/secrets:/run/secrets:ro
+      - ./state:/state
+    secrets:
+      - cf_api_token
+      - cf_zone_id
+      - tech_api_token
+      - pdns_api_key
     deploy:
       resources:
         limits:
           memory: 64M
 
-volumes:
-  state-data:
-
+# Docker secrets — create these files alongside docker-compose.yml
+# and populate them with your real credentials. They are mounted
+# read-only at /run/secrets/<name> inside the container.
+# Reference them in config.json as: "file:/run/secrets/cf_api_token"
+secrets:
+  cf_api_token:
+    file: ./secrets/cf_api_token
+  cf_zone_id:
+    file: ./secrets/cf_zone_id
+  tech_api_token:
+    file: ./secrets/tech_api_token
+  pdns_api_key:
+    file: ./secrets/pdns_api_key
