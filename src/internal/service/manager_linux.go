@@ -72,8 +72,8 @@ func (m *SystemdManager) Install(ctx context.Context, opts Options) error {
 	return nil
 }
 
-// Remove disables and removes the systemd unit file. Idempotent (§8.4).
-func (m *SystemdManager) Remove(ctx context.Context, opts Options) error {
+// Uninstall disables and removes the systemd unit file. Idempotent (§8.4).
+func (m *SystemdManager) Uninstall(ctx context.Context, opts Options) error {
 	path := m.unitPath(opts.Name)
 
 	_ = m.Stop(ctx, opts)
@@ -84,7 +84,7 @@ func (m *SystemdManager) Remove(ctx context.Context, opts Options) error {
 	}
 	_ = m.systemctl(ctx, "daemon-reload")
 
-	m.logger.Information(fmt.Sprintf("Service %q removed", opts.Name))
+	m.logger.Information(fmt.Sprintf("Service %q uninstalled", opts.Name))
 	return nil
 }
 

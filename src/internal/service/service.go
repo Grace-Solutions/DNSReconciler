@@ -5,10 +5,11 @@ import "context"
 type Action string
 
 const (
-	ActionInstall Action = "install"
-	ActionRemove  Action = "remove"
-	ActionStart   Action = "start"
-	ActionStop    Action = "stop"
+	ActionInstall   Action = "install"
+	ActionUninstall Action = "uninstall"
+	ActionStart     Action = "start"
+	ActionStop      Action = "stop"
+	ActionInit      Action = "init"
 )
 
 type Options struct {
@@ -21,7 +22,7 @@ type Options struct {
 
 type Manager interface {
 	Install(ctx context.Context, options Options) error
-	Remove(ctx context.Context, options Options) error
+	Uninstall(ctx context.Context, options Options) error
 	Start(ctx context.Context, options Options) error
 	Stop(ctx context.Context, options Options) error
 }
@@ -32,7 +33,7 @@ func NewUnsupportedManager() UnsupportedManager {
 	return UnsupportedManager{}
 }
 
-func (UnsupportedManager) Install(context.Context, Options) error { return ErrUnsupported }
-func (UnsupportedManager) Remove(context.Context, Options) error  { return ErrUnsupported }
-func (UnsupportedManager) Start(context.Context, Options) error   { return ErrUnsupported }
-func (UnsupportedManager) Stop(context.Context, Options) error    { return ErrUnsupported }
+func (UnsupportedManager) Install(context.Context, Options) error   { return ErrUnsupported }
+func (UnsupportedManager) Uninstall(context.Context, Options) error { return ErrUnsupported }
+func (UnsupportedManager) Start(context.Context, Options) error     { return ErrUnsupported }
+func (UnsupportedManager) Stop(context.Context, Options) error      { return ErrUnsupported }

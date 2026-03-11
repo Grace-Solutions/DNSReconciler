@@ -254,12 +254,17 @@ func (a Application) handleService(command Command) error {
 	switch command.ServiceAction {
 	case service.ActionInstall:
 		return a.serviceManager.Install(ctx, options)
-	case service.ActionRemove:
-		return a.serviceManager.Remove(ctx, options)
+	case service.ActionUninstall:
+		return a.serviceManager.Uninstall(ctx, options)
 	case service.ActionStart:
 		return a.serviceManager.Start(ctx, options)
 	case service.ActionStop:
 		return a.serviceManager.Stop(ctx, options)
+	case service.ActionInit:
+		if err := a.serviceManager.Install(ctx, options); err != nil {
+			return err
+		}
+		return a.serviceManager.Start(ctx, options)
 	default:
 		return fmt.Errorf("unsupported service action %q", command.ServiceAction)
 	}

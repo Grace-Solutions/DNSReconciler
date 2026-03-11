@@ -94,8 +94,8 @@ func (m *LaunchdManager) Install(ctx context.Context, opts Options) error {
 	return nil
 }
 
-// Remove unloads and removes the plist. Idempotent (§8.4).
-func (m *LaunchdManager) Remove(ctx context.Context, opts Options) error {
+// Uninstall unloads and removes the plist. Idempotent (§8.4).
+func (m *LaunchdManager) Uninstall(ctx context.Context, opts Options) error {
 	path := m.plistPath(opts.Name)
 
 	_ = m.launchctl(ctx, "bootout", "system/"+opts.Name)
@@ -104,7 +104,7 @@ func (m *LaunchdManager) Remove(ctx context.Context, opts Options) error {
 		return fmt.Errorf("remove plist %q: %w", path, err)
 	}
 
-	m.logger.Information(fmt.Sprintf("Service %q removed", opts.Name))
+	m.logger.Information(fmt.Sprintf("Service %q uninstalled", opts.Name))
 	return nil
 }
 

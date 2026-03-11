@@ -51,10 +51,10 @@ func (m *WindowsManager) Install(ctx context.Context, opts Options) error {
 	return nil
 }
 
-// Remove unregisters the service. Idempotent: succeeds if not installed (§8.4).
-func (m *WindowsManager) Remove(ctx context.Context, opts Options) error {
+// Uninstall unregisters the service. Idempotent: succeeds if not installed (§8.4).
+func (m *WindowsManager) Uninstall(ctx context.Context, opts Options) error {
 	if !m.serviceExists(ctx, opts.Name) {
-		m.logger.Information(fmt.Sprintf("Service %q not found, nothing to remove", opts.Name))
+		m.logger.Information(fmt.Sprintf("Service %q not found, nothing to uninstall", opts.Name))
 		return nil
 	}
 
@@ -62,9 +62,9 @@ func (m *WindowsManager) Remove(ctx context.Context, opts Options) error {
 	_ = m.Stop(ctx, opts)
 
 	if err := m.runSC(ctx, "delete", opts.Name); err != nil {
-		return fmt.Errorf("remove service %q: %w", opts.Name, err)
+		return fmt.Errorf("uninstall service %q: %w", opts.Name, err)
 	}
-	m.logger.Information(fmt.Sprintf("Service %q removed successfully", opts.Name))
+	m.logger.Information(fmt.Sprintf("Service %q uninstalled successfully", opts.Name))
 	return nil
 }
 

@@ -76,11 +76,11 @@ func parseRun(args []string) (Command, error) {
 
 func parseService(args []string) (Command, error) {
 	if len(args) == 0 {
-		return Command{}, errors.New("service action is required: install, remove, start, or stop")
+		return Command{}, errors.New("service action is required: install, uninstall, start, stop, or init")
 	}
 	action := service.Action(args[0])
 	switch action {
-	case service.ActionInstall, service.ActionRemove, service.ActionStart, service.ActionStop:
+	case service.ActionInstall, service.ActionUninstall, service.ActionStart, service.ActionStop, service.ActionInit:
 	default:
 		return Command{}, fmt.Errorf("unsupported service action %q", args[0])
 	}
