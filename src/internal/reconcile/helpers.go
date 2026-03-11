@@ -2,6 +2,7 @@ package reconcile
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net"
 	"regexp"
@@ -100,12 +101,76 @@ func hasTagCaseInsensitive(tags []core.Tag, name, value string) bool {
 	return false
 }
 
-// matchOwnershipByComment returns true when every value in the ownership
-// map can be found inside the comment string using case-insensitive regex.
+// buildOwnershipComment creates a JSON-structured comment that embeds
+// ownership metadata alongside an optional user-supplied note.
+// The resulting string is portable across all providers — it turns
+// the comment field into a structured tag-like store.
+//
+// Example output:
+//
+//	{"managed-by":"dnsreconciler","node-id":"abc","record-template-id":"xyz","note":"user text"}
+func buildOwnershipComment(userComment string, ownership map[string]string) string {
+	obj := make(map[string]string, len(ownership)+1)
+	for k, v := range ownership {
+		obj[k] = v
+	}
+	if userComment != "" {
+		obj["note"] = userComment
+	}
+	data, err := json.Marshal(obj)
+	if err != nil {
+		// Should never happen with map[string]string, but fall back gracefully.
+		return userComment
+	}
+	return string(data)
+}
+
+// matchOwnershipByComment checks whether the comment contains the
+// required ownership key-value pairs.
+//
+// Strategy:
+//  1. Attempt to parse the comment as JSON and match key-value pairs
+//     case-insensitively (structured matching).
+//  2. If JSON parsing fails (legacy or third-party records), fall back
+//     to case-insensitive regex searching for each ownership value.
 func matchOwnershipByComment(comment string, ownership map[string]string) bool {
 	if comment == "" || len(ownership) == 0 {
 		return false
 	}
+	// Try structured JSON matching first.
+	if matchOwnershipByCommentJSON(comment, ownership) {
+		return true
+	}
+	// Fall back to regex-based matching for legacy comments.
+	return matchOwnershipByCommentRegex(comment, ownership)
+}
+
+// matchOwnershipByCommentJSON parses the comment as a JSON object and
+// checks whether every ownership key-value pair is present (case-insensitive).
+func matchOwnershipByCommentJSON(comment string, ownership map[string]string) bool {
+	var obj map[string]string
+	if err := json.Unmarshal([]byte(comment), &obj); err != nil {
+		return false
+	}
+	for key, val := range ownership {
+		found := false
+		for k, v := range obj {
+			if strings.EqualFold(k, key) && strings.EqualFold(v, val) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// matchOwnershipByCommentRegex searches for each ownership value in the
+// comment text using case-insensitive literal matching. This is a backward-
+// compatible fallback for records that predate the JSON comment format.
+func matchOwnershipByCommentRegex(comment string, ownership map[string]string) bool {
 	for _, val := range ownership {
 		if val == "" {
 			continue

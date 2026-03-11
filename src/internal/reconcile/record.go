@@ -103,15 +103,18 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 		TTL:              ttl,
 		Enabled:          true,
 		Proxied:          proxied,
-		Comment:          comment,
 		Tags:             tags,
 		OwnershipMode:    tmpl.Ownership,
 		RecordTemplateID: tmpl.RecordID,
 	}
-	desired.DesiredFingerprint = fingerprint(desired)
 
 	// §21.2 steps 6-9: query provider, identify owned records, compare
 	filter := buildOwnershipFilter(desired, r.Snapshot.NodeID)
+
+	// Build a JSON-structured comment embedding ownership metadata.
+	// The user's comment template (if any) is stored under the "note" key.
+	desired.Comment = buildOwnershipComment(comment, filter.Ownership)
+	desired.DesiredFingerprint = fingerprint(desired)
 	existing, err := provider.ListRecords(ctx, filter)
 	if err != nil {
 		r.Logger.Error(fmt.Sprintf("Record %s: provider list failed: %s", recordID, err))
