@@ -129,8 +129,13 @@ func (p *Provider) doJSON(ctx context.Context, method, path string, body any, de
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	p.logger.Debug(fmt.Sprintf("HTTP request: %s %s", method, path))
+	start := time.Now()
+
 	resp, err := p.httpClient.Do(req)
+	elapsed := time.Since(start)
 	if err != nil {
+		p.logger.Warning(fmt.Sprintf("HTTP request failed: %s %s (%s): %s", method, path, elapsed, err))
 		return fmt.Errorf("azure: %s %s: %w", method, url, err)
 	}
 	defer resp.Body.Close()
@@ -141,6 +146,7 @@ func (p *Provider) doJSON(ctx context.Context, method, path string, body any, de
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		p.logger.Warning(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
 		var errResp azureErrorResponse
 		if json.Unmarshal(respBody, &errResp) == nil && errResp.Error.Message != "" {
 			return fmt.Errorf("azure: %s %s: %s — %s", method, path, errResp.Error.Code, errResp.Error.Message)
@@ -151,6 +157,8 @@ func (p *Provider) doJSON(ctx context.Context, method, path string, body any, de
 		}
 		return fmt.Errorf("azure: %s %s returned %d: %s", method, path, resp.StatusCode, snippet)
 	}
+
+	p.logger.Debug(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
 
 	if dest != nil && len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, dest); err != nil {

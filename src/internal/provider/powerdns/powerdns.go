@@ -38,7 +38,7 @@ func New(cfg map[string]any, logger *logging.Logger) (core.Provider, error) {
 
 	client := provider.NewAPIClient(baseURL, map[string]string{
 		"X-API-Key": apiKey,
-	})
+	}, logger)
 
 	return &Provider{logger: logger, client: client, serverID: serverID}, nil
 }

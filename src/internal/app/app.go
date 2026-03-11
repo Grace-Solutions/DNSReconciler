@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/gracesolutions/dns-automatic-updater/internal/scheduler"
 	"github.com/gracesolutions/dns-automatic-updater/internal/service"
 	"github.com/gracesolutions/dns-automatic-updater/internal/state"
+	"github.com/gracesolutions/dns-automatic-updater/internal/watcher"
 )
 
 const version = "dev"
@@ -35,6 +37,14 @@ type Application struct {
 	serviceManager service.Manager
 	stdout         io.Writer
 	stderr         io.Writer
+}
+
+// runState holds the mutable configuration and provider state that
+// may be swapped when the config file is modified at runtime.
+type runState struct {
+	mu        sync.RWMutex
+	cfg       config.Config
+	providers map[string]core.Provider
 }
 
 func Main(args []string, stdout, stderr io.Writer) int {
@@ -82,30 +92,48 @@ func (a Application) run(command Command) error {
 		return err
 	}
 
-	rt := &cfg.Settings.Runtime
-	net := &cfg.Settings.Network
-
 	// Apply CLI/env interval override before anything reads it
 	if command.OverrideInterval > 0 {
-		a.logger.Information(fmt.Sprintf("Overriding reconcile interval: %ds → %ds", rt.ReconcileIntervalSeconds, command.OverrideInterval))
-		rt.ReconcileIntervalSeconds = command.OverrideInterval
+		a.logger.Information(fmt.Sprintf("Overriding reconcile interval: %ds → %ds",
+			cfg.Settings.Runtime.ReconcileIntervalSeconds, command.OverrideInterval))
+		cfg.Settings.Runtime.ReconcileIntervalSeconds = command.OverrideInterval
 	}
 
 	// §21.1 step 3: initialize centralized logger
-	a.logger.SetLevel(logging.ParseLevel(rt.LogLevel))
+	a.logger.SetLevel(logging.ParseLevel(cfg.Settings.Runtime.LogLevel))
 
 	// §21.1 step 4: load local state
-	storePath := rt.StatePath
+	storePath := cfg.Settings.Runtime.StatePath
 	if command.OverrideState != "" {
 		storePath = command.OverrideState
 	}
 	store := state.JSONStore{Path: storePath}
 
-	// Build providers once (§9) — keyed by provider ID
-	providers := a.buildProviderMap(cfg)
+	// Mutable state that may be reloaded when the config file changes.
+	rs := &runState{
+		cfg:       cfg,
+		providers: a.buildProviderMap(cfg),
+	}
 
 	// reconcileOnce performs a single reconciliation pass (§21.1 steps 5-10).
 	reconcileOnce := func(ctx context.Context) error {
+		rs.mu.RLock()
+		currentCfg := rs.cfg
+		currentProviders := rs.providers
+		rs.mu.RUnlock()
+
+		rt := &currentCfg.Settings.Runtime
+		net := &currentCfg.Settings.Network
+
+		// Refresh provider capabilities if stale (e.g. Cloudflare plan detection).
+		for _, p := range currentProviders {
+			if refresher, ok := p.(core.CapabilityRefresher); ok {
+				if err := refresher.RefreshCapabilitiesIfStale(ctx); err != nil {
+					a.logger.Warning(fmt.Sprintf("Failed to refresh capabilities for %q: %s", p.Name(), err))
+				}
+			}
+		}
+
 		st, err := store.Load(ctx)
 		if err != nil {
 			return err
@@ -119,14 +147,14 @@ func (a Application) run(command Command) error {
 		}
 
 		// §21.1 step 7: merge defaults
-		mergedRecords := config.MergeAllDefaults(&cfg)
+		mergedRecords := config.MergeAllDefaults(&currentCfg)
 
 		// §21.1 steps 6, 8-9: resolve addresses, expand, reconcile
 		addrResolver := address.NewDefaultResolver(a.logger)
 
 		reconciler := reconcile.Reconciler{
 			Logger:          a.logger,
-			Providers:       providers,
+			Providers:       currentProviders,
 			AddressResolver: addrResolver,
 			Snapshot:        snap,
 			GlobalSources:   net.AddressSources,
@@ -169,12 +197,22 @@ func (a Application) run(command Command) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Start config file watcher
+	fw := watcher.New(command.ConfigPath, a.logger)
+	if err := fw.Init(); err != nil {
+		a.logger.Warning(fmt.Sprintf("Config watcher init failed (continuing without): %s", err))
+	}
+	configChanged := fw.Watch(ctx)
+
+	// Launch goroutine that reloads config when the file changes.
+	go a.watchConfigReload(ctx, command, rs, configChanged)
+
 	sched := scheduler.New(a.logger, scheduler.Config{
-		IntervalSeconds: rt.ReconcileIntervalSeconds,
+		IntervalSeconds: cfg.Settings.Runtime.ReconcileIntervalSeconds,
 		JitterPercent:   10,
 	}, reconcileOnce)
 
-	a.logger.Information(fmt.Sprintf("Starting scheduler (interval=%ds)", rt.ReconcileIntervalSeconds))
+	a.logger.Information(fmt.Sprintf("Starting scheduler (interval=%ds)", cfg.Settings.Runtime.ReconcileIntervalSeconds))
 	err = sched.Run(ctx)
 	if err != nil && err != context.Canceled {
 		return err
@@ -182,14 +220,18 @@ func (a Application) run(command Command) error {
 	a.logger.Information("Scheduler stopped gracefully")
 
 	// §26.1: cleanup on graceful shutdown
-	if rt.CleanupOnShutdown {
+	rs.mu.RLock()
+	cleanupOnShutdown := rs.cfg.Settings.Runtime.CleanupOnShutdown
+	cleanupProviders := rs.providers
+	rs.mu.RUnlock()
+
+	if cleanupOnShutdown {
 		a.logger.Information("CleanupOnShutdown is enabled — deleting owned records")
 		cleaner := cleanup.Cleaner{
 			Logger:    a.logger,
-			Providers: providers,
+			Providers: cleanupProviders,
 			Store:     &store,
 		}
-		// Use a fresh context since the signal context is cancelled
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		if err := cleaner.Run(cleanupCtx); err != nil {
@@ -198,6 +240,45 @@ func (a Application) run(command Command) error {
 	}
 
 	return nil
+}
+
+// watchConfigReload listens for config file changes and reloads configuration
+// and providers. Invalid configs are logged and skipped — the previous valid
+// config continues to be used.
+func (a Application) watchConfigReload(ctx context.Context, command Command, rs *runState, changes <-chan struct{}) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case _, ok := <-changes:
+			if !ok {
+				return
+			}
+			a.logger.Information("Reloading configuration...")
+
+			newCfg, err := config.Load(command.ConfigPath)
+			if err != nil {
+				a.logger.Error(fmt.Sprintf("Config reload failed (keeping current config): %s", err))
+				continue
+			}
+
+			// Re-apply CLI overrides
+			if command.OverrideInterval > 0 {
+				newCfg.Settings.Runtime.ReconcileIntervalSeconds = command.OverrideInterval
+			}
+
+			a.logger.SetLevel(logging.ParseLevel(newCfg.Settings.Runtime.LogLevel))
+			newProviders := a.buildProviderMap(newCfg)
+
+			rs.mu.Lock()
+			rs.cfg = newCfg
+			rs.providers = newProviders
+			rs.mu.Unlock()
+
+			a.logger.Information(fmt.Sprintf("Configuration reloaded successfully (%d providers, %d records)",
+				len(newCfg.Providers), len(newCfg.Records)))
+		}
+	}
 }
 
 // buildProviderMap creates provider instances from the providers array,

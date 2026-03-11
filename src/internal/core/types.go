@@ -53,3 +53,11 @@ type Provider interface {
 	UpdateRecord(ctx context.Context, record Record) (Record, error)
 	DeleteRecord(ctx context.Context, record Record) error
 }
+
+// CapabilityRefresher is an optional interface that providers can implement
+// to periodically refresh their capabilities (e.g. Cloudflare plan detection).
+// The reconciliation loop calls RefreshCapabilitiesIfStale before each pass
+// for providers that implement this interface.
+type CapabilityRefresher interface {
+	RefreshCapabilitiesIfStale(ctx context.Context) error
+}

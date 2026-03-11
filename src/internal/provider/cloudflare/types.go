@@ -37,3 +37,23 @@ type cfMessage struct {
 	Message string `json:"message"`
 }
 
+// cfZoneResponse wraps the Cloudflare GET /zones/{id} response.
+type cfZoneResponse struct {
+	Success bool     `json:"success"`
+	Errors  []cfError `json:"errors"`
+	Result  cfZone   `json:"result"`
+}
+
+// cfZone represents the zone object from the Cloudflare API.
+type cfZone struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Plan cfPlan `json:"plan"`
+}
+
+// cfPlan represents the plan attached to a Cloudflare zone.
+type cfPlan struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+

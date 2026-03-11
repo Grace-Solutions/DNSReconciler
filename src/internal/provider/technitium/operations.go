@@ -31,6 +31,7 @@ func (p *Provider) ListRecords(ctx context.Context, filter core.RecordFilter) ([
 	for _, r := range resp.Response.Records {
 		records = append(records, fromTechRecord(r, filter.Zone))
 	}
+	p.logger.Debug(fmt.Sprintf("Technitium: listed %d records for zone %s (filter: name=%q type=%q)", len(records), filter.Zone, filter.Name, filter.Type))
 	return records, nil
 }
 
@@ -47,7 +48,7 @@ func (p *Provider) CreateRecord(ctx context.Context, record core.Record) (core.R
 		return core.Record{}, fmt.Errorf("technitium create record: %s", resp.ErrorMsg)
 	}
 
-	p.logger.Debug(fmt.Sprintf("Technitium: created record %s %s", record.Type, record.Name))
+	p.logger.Information(fmt.Sprintf("Technitium: created %s record %s → %s", record.Type, record.Name, record.Content))
 	created := record
 	created.ProviderRecordID = fmt.Sprintf("%s|%s|%s", record.Zone, record.Name, record.Type)
 	return created, nil
@@ -71,7 +72,7 @@ func (p *Provider) UpdateRecord(ctx context.Context, record core.Record) (core.R
 		return core.Record{}, fmt.Errorf("technitium update record: %s", resp.ErrorMsg)
 	}
 
-	p.logger.Debug(fmt.Sprintf("Technitium: updated record %s %s", record.Type, record.Name))
+	p.logger.Information(fmt.Sprintf("Technitium: updated %s record %s → %s", record.Type, record.Name, record.Content))
 	return record, nil
 }
 
@@ -88,7 +89,7 @@ func (p *Provider) DeleteRecord(ctx context.Context, record core.Record) error {
 		return fmt.Errorf("technitium delete record: %s", resp.ErrorMsg)
 	}
 
-	p.logger.Debug(fmt.Sprintf("Technitium: deleted record %s %s", record.Type, record.Name))
+	p.logger.Information(fmt.Sprintf("Technitium: deleted %s record %s", record.Type, record.Name))
 	return nil
 }
 

@@ -36,6 +36,7 @@ func (p *Provider) ListRecords(ctx context.Context, filter core.RecordFilter) ([
 		}
 	}
 
+	p.logger.Debug(fmt.Sprintf("Azure: listed %d records for zone %s (filter: name=%q type=%q)", len(records), p.zoneName, filter.Name, filter.Type))
 	return records, nil
 }
 
@@ -56,7 +57,7 @@ func (p *Provider) DeleteRecord(ctx context.Context, record core.Record) error {
 	if err := p.doJSON(ctx, "DELETE", path, nil, nil); err != nil {
 		return fmt.Errorf("azure delete record: %w", err)
 	}
-	p.logger.Debug(fmt.Sprintf("Azure: deleted record set %s %s", record.Type, record.Name))
+	p.logger.Information(fmt.Sprintf("Azure: deleted %s record set %s", record.Type, record.Name))
 	return nil
 }
 
@@ -72,7 +73,7 @@ func (p *Provider) upsertRecord(ctx context.Context, record core.Record) (core.R
 		return core.Record{}, fmt.Errorf("azure upsert record: %w", err)
 	}
 
-	p.logger.Debug(fmt.Sprintf("Azure: upserted record set %s %s", record.Type, record.Name))
+	p.logger.Information(fmt.Sprintf("Azure: upserted %s record set %s → %s", record.Type, record.Name, record.Content))
 	result := record
 	result.ProviderRecordID = resp.ID
 	return result, nil

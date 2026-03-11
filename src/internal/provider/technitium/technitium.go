@@ -35,7 +35,7 @@ func New(cfg map[string]any, logger *logging.Logger) (core.Provider, error) {
 
 	baseURL := provider.OptionalString(cfg, "baseUrl", defaultBaseURL)
 
-	client := provider.NewAPIClient(baseURL, map[string]string{})
+	client := provider.NewAPIClient(baseURL, map[string]string{}, logger)
 
 	return &Provider{logger: logger, client: client, apiToken: token}, nil
 }

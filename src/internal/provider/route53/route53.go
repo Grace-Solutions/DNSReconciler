@@ -109,8 +109,13 @@ func (p *Provider) doXML(ctx context.Context, method, path string, body []byte, 
 
 	p.signer.sign(req, body)
 
+	p.logger.Debug(fmt.Sprintf("HTTP request: %s %s", method, path))
+	start := time.Now()
+
 	resp, err := p.httpClient.Do(req)
+	elapsed := time.Since(start)
 	if err != nil {
+		p.logger.Warning(fmt.Sprintf("HTTP request failed: %s %s (%s): %s", method, path, elapsed, err))
 		return fmt.Errorf("route53: %s %s: %w", method, url, err)
 	}
 	defer resp.Body.Close()
@@ -121,6 +126,7 @@ func (p *Provider) doXML(ctx context.Context, method, path string, body []byte, 
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		p.logger.Warning(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
 		var errResp errorResponse
 		if xml.Unmarshal(respBody, &errResp) == nil {
 			return fmt.Errorf("route53: %s %s: %s — %s", method, path, errResp.Error.Code, errResp.Error.Message)
@@ -131,6 +137,8 @@ func (p *Provider) doXML(ctx context.Context, method, path string, body []byte, 
 		}
 		return fmt.Errorf("route53: %s %s returned %d: %s", method, path, resp.StatusCode, snippet)
 	}
+
+	p.logger.Debug(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
 
 	if dest != nil && len(respBody) > 0 {
 		if err := xml.Unmarshal(respBody, dest); err != nil {

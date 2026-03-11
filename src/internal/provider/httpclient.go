@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/gracesolutions/dns-automatic-updater/internal/logging"
 )
 
 // APIClient wraps an http.Client with common JSON/REST patterns.
@@ -15,16 +17,18 @@ type APIClient struct {
 	BaseURL    string
 	HTTPClient *http.Client
 	Headers    map[string]string
+	Logger     *logging.Logger
 }
 
 // NewAPIClient creates a client with reasonable defaults.
-func NewAPIClient(baseURL string, headers map[string]string) *APIClient {
+func NewAPIClient(baseURL string, headers map[string]string, logger *logging.Logger) *APIClient {
 	return &APIClient{
 		BaseURL: baseURL,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 		Headers: headers,
+		Logger:  logger,
 	}
 }
 
@@ -53,8 +57,13 @@ func (c *APIClient) Do(ctx context.Context, method, path string, body any, dest 
 		req.Header.Set(k, v)
 	}
 
+	c.Logger.Debug(fmt.Sprintf("HTTP request: %s %s", method, path))
+	start := time.Now()
+
 	resp, err := c.HTTPClient.Do(req)
+	elapsed := time.Since(start)
 	if err != nil {
+		c.Logger.Warning(fmt.Sprintf("HTTP request failed: %s %s (%s): %s", method, path, elapsed, err))
 		return nil, fmt.Errorf("%s %s: %w", method, url, err)
 	}
 	defer resp.Body.Close()
@@ -65,6 +74,7 @@ func (c *APIClient) Do(ctx context.Context, method, path string, body any, dest 
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		c.Logger.Warning(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
 		return resp, &APIError{
 			StatusCode: resp.StatusCode,
 			Method:     method,
@@ -72,6 +82,8 @@ func (c *APIClient) Do(ctx context.Context, method, path string, body any, dest 
 			Body:       string(respBody),
 		}
 	}
+
+	c.Logger.Debug(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
 
 	if dest != nil && len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, dest); err != nil {

@@ -37,6 +37,7 @@ func (p *Provider) ListRecords(ctx context.Context, filter core.RecordFilter) ([
 	for i, r := range resp.Result {
 		records[i] = fromCFRecord(r)
 	}
+	p.logger.Debug(fmt.Sprintf("Cloudflare: listed %d records for zone %s (filter: name=%q type=%q)", len(records), p.zoneID, filter.Name, filter.Type))
 	return records, nil
 }
 
@@ -53,7 +54,7 @@ func (p *Provider) CreateRecord(ctx context.Context, record core.Record) (core.R
 		return core.Record{}, fmt.Errorf("cloudflare create record: API returned errors: %v", resp.Errors)
 	}
 
-	p.logger.Debug(fmt.Sprintf("Cloudflare: created record %s (%s)", resp.Result.ID, record.Name))
+	p.logger.Information(fmt.Sprintf("Cloudflare: created %s record %s → %s (id: %s)", record.Type, record.Name, record.Content, resp.Result.ID))
 	return fromCFRecord(resp.Result), nil
 }
 
@@ -73,7 +74,7 @@ func (p *Provider) UpdateRecord(ctx context.Context, record core.Record) (core.R
 		return core.Record{}, fmt.Errorf("cloudflare update record: API returned errors: %v", resp.Errors)
 	}
 
-	p.logger.Debug(fmt.Sprintf("Cloudflare: updated record %s (%s)", resp.Result.ID, record.Name))
+	p.logger.Information(fmt.Sprintf("Cloudflare: updated %s record %s → %s (id: %s)", record.Type, record.Name, record.Content, resp.Result.ID))
 	return fromCFRecord(resp.Result), nil
 }
 
@@ -87,7 +88,7 @@ func (p *Provider) DeleteRecord(ctx context.Context, record core.Record) error {
 	if _, err := p.client.Do(ctx, "DELETE", path, nil, nil); err != nil {
 		return fmt.Errorf("cloudflare delete record: %w", err)
 	}
-	p.logger.Debug(fmt.Sprintf("Cloudflare: deleted record %s (%s)", record.ProviderRecordID, record.Name))
+	p.logger.Information(fmt.Sprintf("Cloudflare: deleted %s record %s (id: %s)", record.Type, record.Name, record.ProviderRecordID))
 	return nil
 }
 

@@ -52,6 +52,7 @@ func (p *Provider) ListRecords(ctx context.Context, filter core.RecordFilter) ([
 			})
 		}
 	}
+	p.logger.Debug(fmt.Sprintf("PowerDNS: listed %d records for zone %s (filter: name=%q type=%q)", len(records), filter.Zone, filter.Name, filter.Type))
 	return records, nil
 }
 
@@ -79,7 +80,7 @@ func (p *Provider) DeleteRecord(ctx context.Context, record core.Record) error {
 	if _, err := p.client.Do(ctx, "PATCH", path, body, nil); err != nil {
 		return fmt.Errorf("powerdns delete record: %w", err)
 	}
-	p.logger.Debug(fmt.Sprintf("PowerDNS: deleted RRset %s %s", record.Type, record.Name))
+	p.logger.Information(fmt.Sprintf("PowerDNS: deleted RRset %s %s", record.Type, record.Name))
 	return nil
 }
 
@@ -111,7 +112,7 @@ func (p *Provider) upsertRecord(ctx context.Context, record core.Record, changet
 
 	result := record
 	result.ProviderRecordID = fmt.Sprintf("%s|%s|%s", name, record.Type, record.Content)
-	p.logger.Debug(fmt.Sprintf("PowerDNS: %s RRset %s %s", changetype, record.Type, record.Name))
+	p.logger.Information(fmt.Sprintf("PowerDNS: %s RRset %s %s → %s", changetype, record.Type, record.Name, record.Content))
 	return result, nil
 }
 

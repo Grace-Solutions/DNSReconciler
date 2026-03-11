@@ -59,6 +59,7 @@ func (p *Provider) ListRecords(ctx context.Context, filter core.RecordFilter) ([
 		}
 	}
 
+	p.logger.Debug(fmt.Sprintf("Route53: listed %d records for hosted zone %s (filter: name=%q type=%q)", len(records), p.hostedZoneID, filter.Name, filter.Type))
 	return records, nil
 }
 
@@ -119,8 +120,8 @@ func (p *Provider) changeRecord(ctx context.Context, action string, record core.
 		return core.Record{}, fmt.Errorf("route53 %s record: %w", strings.ToLower(action), err)
 	}
 
-	p.logger.Debug(fmt.Sprintf("Route53: %s record %s %s (change: %s, status: %s)",
-		strings.ToLower(action), record.Type, record.Name, resp.ChangeInfo.ID, resp.ChangeInfo.Status))
+	p.logger.Information(fmt.Sprintf("Route53: %s %s record %s → %s (change: %s, status: %s)",
+		strings.ToLower(action), record.Type, record.Name, record.Content, resp.ChangeInfo.ID, resp.ChangeInfo.Status))
 
 	result := record
 	result.ProviderRecordID = fmt.Sprintf("%s|%s|%s", record.Zone, record.Name, record.Type)
