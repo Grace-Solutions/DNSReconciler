@@ -12,7 +12,7 @@ import (
 
 // reconcileOne implements §21.2 for a single record.
 func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplate, st *state.File) Result {
-	recordID := tmpl.ID
+	recordID := tmpl.RecordID
 	r.Logger.Debug(fmt.Sprintf("Reconciling record %s", recordID))
 
 	// §21.2 step 1: determine applicable provider (looked up by providerId)
@@ -42,9 +42,9 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	rv := expansion.RecordVars{
 		SelectedIPv4: selectByFamily(addrResult.Address, "ipv4"),
 		SelectedIPv6: selectByFamily(addrResult.Address, "ipv6"),
-		ServiceName:  tmpl.ID,
+		ServiceName:  tmpl.RecordID,
 		Zone:         tmpl.Zone,
-		RecordID:     tmpl.ID,
+		RecordID:     tmpl.RecordID,
 	}
 	expCtx := expansion.BuildContext(r.Snapshot, rv)
 
@@ -94,7 +94,7 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 		Comment:          comment,
 		Tags:             tags,
 		OwnershipMode:    tmpl.Ownership,
-		RecordTemplateID: tmpl.ID,
+		RecordTemplateID: tmpl.RecordID,
 	}
 	desired.DesiredFingerprint = fingerprint(desired)
 

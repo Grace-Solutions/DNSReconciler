@@ -67,39 +67,44 @@ func (c Config) Validate() error {
 		if prov.Type == "" {
 			return fmt.Errorf("provider %q must define a type", prov.ID)
 		}
-		if prov.Defaults.Ownership != "" && !isAllowed(prov.Defaults.Ownership, "perNode", "singleton", "manual", "disabled") {
-			return fmt.Errorf("provider %q has unsupported defaults.ownership %q", prov.ID, prov.Defaults.Ownership)
-		}
 	}
 
 	// Validate records
 	seenIDs := map[string]struct{}{}
-	for _, record := range c.Records {
-		if record.ID == "" {
-			return errors.New("records[].id is required")
+	for i, record := range c.Records {
+		if record.RecordID == "" {
+			return errors.New("records[].recordId is required")
 		}
-		if _, exists := seenIDs[record.ID]; exists {
-			return fmt.Errorf("duplicate record id %q", record.ID)
+		if _, exists := seenIDs[record.RecordID]; exists {
+			return fmt.Errorf("duplicate record id %q", record.RecordID)
 		}
-		seenIDs[record.ID] = struct{}{}
-		if record.ProviderID == "" || record.Zone == "" || record.Type == "" || record.Name == "" || record.Content == "" {
-			return fmt.Errorf("record %q must define providerId, zone, type, name, and content", record.ID)
+		seenIDs[record.RecordID] = struct{}{}
+		if record.ProviderID == "" || record.Type == "" || record.Name == "" || record.Content == "" {
+			return fmt.Errorf("record %q must define providerId, type, name, and content", record.RecordID)
 		}
 		// Validate that referenced provider exists
-		if c.FindProvider(record.ProviderID) == nil {
-			return fmt.Errorf("record %q references unknown provider %q", record.ID, record.ProviderID)
+		prov := c.FindProvider(record.ProviderID)
+		if prov == nil {
+			return fmt.Errorf("record %q references unknown provider %q", record.RecordID, record.ProviderID)
+		}
+		// Inherit zone from provider if not set on the record
+		if record.Zone == "" {
+			if prov.Zone == "" {
+				return fmt.Errorf("record %q has no zone and provider %q defines no default zone", record.RecordID, record.ProviderID)
+			}
+			c.Records[i].Zone = prov.Zone
 		}
 		if record.Type != "A" && record.Type != "AAAA" {
-			return fmt.Errorf("record %q: %w", record.ID, errInvalidRecordType)
+			return fmt.Errorf("record %q: %w", record.RecordID, errInvalidRecordType)
 		}
 		if record.Ownership != "" && !isAllowed(record.Ownership, "perNode", "singleton", "manual", "disabled") {
-			return fmt.Errorf("record %q has unsupported ownership %q", record.ID, record.Ownership)
+			return fmt.Errorf("record %q has unsupported ownership %q", record.RecordID, record.Ownership)
 		}
 		if record.IPFamily != "" && !isAllowed(strings.ToLower(record.IPFamily), "ipv4", "ipv6", "dual") {
-			return fmt.Errorf("record %q has unsupported ipFamily %q", record.ID, record.IPFamily)
+			return fmt.Errorf("record %q has unsupported ipFamily %q", record.RecordID, record.IPFamily)
 		}
 		if record.AddressSelection != nil {
-			if err := validateSources("records["+record.ID+"].addressSelection.sources", record.AddressSelection.Sources); err != nil {
+			if err := validateSources("records["+record.RecordID+"].addressSelection.sources", record.AddressSelection.Sources); err != nil {
 				return err
 			}
 		}

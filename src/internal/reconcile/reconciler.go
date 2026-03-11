@@ -57,9 +57,9 @@ func (r *Reconciler) ReconcileAll(ctx context.Context, templates []config.Record
 
 	for _, tmpl := range templates {
 		if tmpl.Enabled != nil && !*tmpl.Enabled {
-			r.Logger.Debug(fmt.Sprintf("Record %s is disabled, skipping", tmpl.ID))
+			r.Logger.Debug(fmt.Sprintf("Record %s is disabled, skipping", tmpl.RecordID))
 			stats.Skipped++
-			results = append(results, Result{RecordID: tmpl.ID, Action: ActionSkip})
+			results = append(results, Result{RecordID: tmpl.RecordID, Action: ActionSkip})
 			continue
 		}
 

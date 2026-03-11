@@ -13,7 +13,7 @@ func TestValidateAcceptsMinimalConfig(t *testing.T) {
 			Type: "cloudflare",
 		}},
 		Records: []RecordTemplate{{
-			ID:         "public-api",
+			RecordID:   "public-api",
 			ProviderID: "cf-1",
 			Zone:       "example.com",
 			Type:       "A",
@@ -39,7 +39,7 @@ func TestValidateRejectsDuplicatePriorities(t *testing.T) {
 		},
 		Providers: []ProviderEntry{{ID: "cf-1", Type: "cloudflare"}},
 		Records: []RecordTemplate{{
-			ID:         "public-api",
+			RecordID:   "public-api",
 			ProviderID: "cf-1",
 			Zone:       "example.com",
 			Type:       "A",
@@ -60,7 +60,7 @@ func TestValidateRejectsUnknownProvider(t *testing.T) {
 		},
 		Providers: []ProviderEntry{{ID: "cf-1", Type: "cloudflare"}},
 		Records: []RecordTemplate{{
-			ID:         "rec-1",
+			RecordID:   "rec-1",
 			ProviderID: "nonexistent",
 			Zone:       "example.com",
 			Type:       "A",

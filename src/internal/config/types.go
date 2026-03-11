@@ -35,16 +35,21 @@ type NetworkConfig struct {
 	AddressSources []AddressSource `json:"addressSources"`
 }
 
-// ProviderEntry defines a single provider instance with its credentials and defaults.
-// The ID can be a UUIDv4 or a friendly name; it must be unique across all providers.
+// ProviderEntry defines a single provider instance with its credentials and
+// inheritable record defaults. Default values for TTL, Proxied, Comment, Tags,
+// and Zone live directly on the provider — no nested "defaults" wrapper.
 // RawConfig captures all JSON fields so provider factories can read credentials.
 type ProviderEntry struct {
-	ID           string          `json:"id"`
-	FriendlyName string          `json:"friendlyName,omitempty"`
-	Type         string          `json:"type"`
-	Enabled      *bool           `json:"enabled,omitempty"`
-	Defaults     RecordDefaults  `json:"defaults"`
-	RawConfig    map[string]any  `json:"-"` // populated during unmarshal
+	ID           string         `json:"id"`
+	FriendlyName string         `json:"friendlyName,omitempty"`
+	Type         string         `json:"type"`
+	Enabled      *bool          `json:"enabled,omitempty"`
+	Zone         string         `json:"zone,omitempty"`
+	TTL          *int           `json:"ttl,omitempty"`
+	Proxied      *bool          `json:"proxied,omitempty"`
+	Comment      string         `json:"comment,omitempty"`
+	Tags         []Tag          `json:"tags,omitempty"`
+	RawConfig    map[string]any `json:"-"` // populated during unmarshal
 }
 
 // UnmarshalJSON implements custom unmarshaling for ProviderEntry.
@@ -73,32 +78,22 @@ func (p *ProviderEntry) IsEnabled() bool {
 	return p.Enabled == nil || *p.Enabled
 }
 
-// RecordDefaults holds default values that can be set at the provider level
-// and inherited by records referencing that provider.
-type RecordDefaults struct {
-	Enabled   *bool  `json:"enabled,omitempty"`
-	Ownership string `json:"ownership,omitempty"`
-	TTL       *int   `json:"ttl,omitempty"`
-	Proxied   *bool  `json:"proxied,omitempty"`
-	Comment   string `json:"comment,omitempty"`
-	Tags      []Tag  `json:"tags,omitempty"`
-}
-
 // RecordTemplate defines a DNS record to be reconciled.
 // ProviderID links to a ProviderEntry by its ID or FriendlyName.
+// Zone is optional — inherited from the provider if not set.
 type RecordTemplate struct {
-	ID               string            `json:"id"`
-	Enabled          *bool             `json:"enabled,omitempty"`
 	ProviderID       string            `json:"providerId"`
-	Ownership        string            `json:"ownership,omitempty"`
-	Zone             string            `json:"zone"`
+	RecordID         string            `json:"recordId"`
+	Enabled          *bool             `json:"enabled,omitempty"`
 	Type             string            `json:"type"`
 	Name             string            `json:"name"`
 	Content          string            `json:"content"`
+	Zone             string            `json:"zone,omitempty"`
 	TTL              *int              `json:"ttl,omitempty"`
 	Proxied          *bool             `json:"proxied,omitempty"`
 	Comment          string            `json:"comment,omitempty"`
 	Tags             []Tag             `json:"tags,omitempty"`
+	Ownership        string            `json:"ownership,omitempty"`
 	MatchLabels      map[string]string `json:"matchLabels,omitempty"`
 	AddressSelection *AddressSelection `json:"addressSelection,omitempty"`
 	IPFamily         string            `json:"ipFamily,omitempty"`

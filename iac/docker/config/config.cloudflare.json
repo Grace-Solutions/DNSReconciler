@@ -24,34 +24,30 @@
             "apiToken":     "env:CF_API_TOKEN",
             "zoneId":       "env:CF_ZONE_ID",
             "baseUrl":      "https://api.cloudflare.com/client/v4",
-            "defaults": {
-                "ownership": "perNode",
-                "ttl":       120,
-                "proxied":   false,
-                "comment":   "Managed by dnsreconciler on ${HOSTNAME}",
-                "tags": [
-                    { "name": "managed-by", "value": "dnsreconciler" },
-                    { "name": "node-id",    "value": "${NODE_ID}" }
-                ]
-            }
+            "zone":         "example.com",
+            "ttl":          120,
+            "proxied":      false,
+            "comment":      "Managed by dnsreconciler on ${HOSTNAME}",
+            "tags": [
+                { "name": "managed-by", "value": "dnsreconciler" },
+                { "name": "node-id",    "value": "${NODE_ID}" }
+            ]
         }
     ],
 
     "records": [
         {
-            "id":         "d40a7f8d-f3a0-499e-842e-f066dc6bf874",
-            "enabled":    true,
             "providerId": "cloudflare-primary",
-            "zone":       "example.com",
+            "recordId":   "d40a7f8d-f3a0-499e-842e-f066dc6bf874",
+            "enabled":    true,
             "type":       "A",
             "name":       "${HOSTNAME}.example.com",
             "content":    "${SELECTED_IPV4}"
         },
         {
-            "id":         "2da921f6-3e5d-4215-9373-5d685820f2e8",
-            "enabled":    false,
             "providerId": "cloudflare-primary",
-            "zone":       "example.com",
+            "recordId":   "2da921f6-3e5d-4215-9373-5d685820f2e8",
+            "enabled":    false,
             "type":       "AAAA",
             "name":       "${HOSTNAME}.example.com",
             "content":    "${SELECTED_IPV6}"

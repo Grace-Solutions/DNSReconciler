@@ -138,7 +138,7 @@ func (a Application) run(command Command) error {
 		// Prune orphaned state entries for records no longer in config
 		activeIDs := make(map[string]struct{}, len(mergedRecords))
 		for _, r := range mergedRecords {
-			activeIDs[r.ID] = struct{}{}
+			activeIDs[r.RecordID] = struct{}{}
 		}
 		if pruned := st.PruneOrphans(activeIDs); pruned > 0 {
 			a.logger.Information(fmt.Sprintf("Pruned %d orphaned state entries", pruned))
