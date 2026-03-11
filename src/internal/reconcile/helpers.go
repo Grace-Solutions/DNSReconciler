@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,26 +42,72 @@ func buildOwnershipFilter(desired core.Record, nodeID string) core.RecordFilter 
 }
 
 // findOwnedRecord locates the record we own among the existing set.
-// For now, matches by name+type+template ID tag.
-func findOwnedRecord(existing []core.Record, desired core.Record) *core.Record {
+// It matches by name+type and then checks ownership via tags or comment
+// using case-insensitive matching.
+//
+// Strategy:
+//  1. If the existing record has tags, check whether every ownership
+//     key-value pair appears in the tags (case-insensitive).
+//  2. If tag matching fails (or no tags present), fall back to the
+//     comment field and check whether every ownership value appears
+//     in the comment text (case-insensitive regex).
+func findOwnedRecord(existing []core.Record, desired core.Record, ownership map[string]string) *core.Record {
 	for i, rec := range existing {
-		if rec.Name == desired.Name && rec.Type == desired.Type {
-			if hasMatchingTemplateTag(rec.Tags, desired.RecordTemplateID) {
-				return &existing[i]
-			}
+		if !strings.EqualFold(rec.Name, desired.Name) || !strings.EqualFold(rec.Type, desired.Type) {
+			continue
+		}
+		if matchOwnershipByTags(rec.Tags, ownership) {
+			return &existing[i]
+		}
+		if matchOwnershipByComment(rec.Comment, ownership) {
+			return &existing[i]
 		}
 	}
 	return nil
 }
 
-// hasMatchingTemplateTag checks if the record has a record-template-id tag matching the desired ID.
-func hasMatchingTemplateTag(tags []core.Tag, templateID string) bool {
+// matchOwnershipByTags returns true when every key-value pair in the
+// ownership map has a corresponding tag on the record (case-insensitive).
+func matchOwnershipByTags(tags []core.Tag, ownership map[string]string) bool {
+	if len(tags) == 0 || len(ownership) == 0 {
+		return false
+	}
+	for key, val := range ownership {
+		if !hasTagCaseInsensitive(tags, key, val) {
+			return false
+		}
+	}
+	return true
+}
+
+// hasTagCaseInsensitive checks if any tag matches the given name and value,
+// using case-insensitive comparison.
+func hasTagCaseInsensitive(tags []core.Tag, name, value string) bool {
 	for _, t := range tags {
-		if t.Name == "record-template-id" && t.Value == templateID {
+		if strings.EqualFold(t.Name, name) && strings.EqualFold(t.Value, value) {
 			return true
 		}
 	}
 	return false
+}
+
+// matchOwnershipByComment returns true when every value in the ownership
+// map can be found inside the comment string using case-insensitive regex.
+func matchOwnershipByComment(comment string, ownership map[string]string) bool {
+	if comment == "" || len(ownership) == 0 {
+		return false
+	}
+	for _, val := range ownership {
+		if val == "" {
+			continue
+		}
+		pattern := "(?i)" + regexp.QuoteMeta(val)
+		matched, err := regexp.MatchString(pattern, comment)
+		if err != nil || !matched {
+			return false
+		}
+	}
+	return true
 }
 
 // updateState persists the reconciliation result in local state (§21.2 step 11).

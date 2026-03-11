@@ -118,12 +118,12 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	}
 
 	// §21.2 step 10: perform action
-	return r.performAction(ctx, provider, desired, existing, recordID, st)
+	return r.performAction(ctx, provider, desired, existing, recordID, st, filter.Ownership)
 }
 
 // performAction determines and executes the correct action.
-func (r *Reconciler) performAction(ctx context.Context, provider core.Provider, desired core.Record, existing []core.Record, recordID string, st *state.File) Result {
-	owned := findOwnedRecord(existing, desired)
+func (r *Reconciler) performAction(ctx context.Context, provider core.Provider, desired core.Record, existing []core.Record, recordID string, st *state.File, ownership map[string]string) Result {
+	owned := findOwnedRecord(existing, desired, ownership)
 
 	if owned == nil {
 		// Create
