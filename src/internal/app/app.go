@@ -7,8 +7,10 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/gracesolutions/dns-automatic-updater/internal/address"
+	"github.com/gracesolutions/dns-automatic-updater/internal/cleanup"
 	"github.com/gracesolutions/dns-automatic-updater/internal/config"
 	"github.com/gracesolutions/dns-automatic-updater/internal/core"
 	"github.com/gracesolutions/dns-automatic-updater/internal/logging"
@@ -152,6 +154,23 @@ func (a Application) run(command Command) error {
 		return err
 	}
 	a.logger.Information("Scheduler stopped gracefully")
+
+	// §26.1: cleanup on graceful shutdown
+	if cfg.Runtime.CleanupOnShutdown {
+		a.logger.Information("CleanupOnShutdown is enabled — deleting owned records")
+		cleaner := cleanup.Cleaner{
+			Logger:    a.logger,
+			Providers: providers,
+			Store:     &store,
+		}
+		// Use a fresh context since the signal context is cancelled
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := cleaner.Run(cleanupCtx); err != nil {
+			a.logger.Error(fmt.Sprintf("Cleanup failed: %s", err))
+		}
+	}
+
 	return nil
 }
 
