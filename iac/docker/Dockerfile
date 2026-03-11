@@ -17,18 +17,23 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 # ---- Runtime stage ----
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tzdata \
-    && addgroup -S dnsreconciler \
-    && adduser -S -G dnsreconciler dnsreconciler
+RUN apk add --no-cache ca-certificates tzdata su-exec \
+    && addgroup -g 911 -S dnsreconciler \
+    && adduser -u 911 -G dnsreconciler -S -H -D dnsreconciler
+
+# Default PUID/PGID — override at runtime to match host ownership
+ENV PUID=911
+ENV PGID=911
 
 # Prepare mount points per §8.2
 RUN mkdir -p /config /state \
     && chown dnsreconciler:dnsreconciler /config /state
 
 COPY --from=build /dnsreconciler /usr/local/bin/dnsreconciler
+COPY iac/docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-USER dnsreconciler
-
-ENTRYPOINT ["dnsreconciler"]
-CMD ["-config", "/config/config.json"]
+# Entrypoint runs as root to fix permissions, then drops to PUID:PGID
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["dnsreconciler", "-config", "/config/config.json"]
 
