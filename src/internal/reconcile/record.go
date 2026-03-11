@@ -108,12 +108,13 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 		RecordTemplateID: tmpl.RecordID,
 	}
 
-	// §21.2 steps 6-9: query provider, identify owned records, compare
-	filter := buildOwnershipFilter(desired, r.Snapshot.NodeID)
+	// Build the comment from the user's template (single-quote → double-quote
+	// normalisation, no injected system keys).
+	desired.Comment = buildOwnershipComment(comment)
 
-	// Build a JSON-structured comment embedding ownership metadata.
-	// The user's comment template (if any) is stored under the "note" key.
-	desired.Comment = buildOwnershipComment(comment, filter.Ownership)
+	// §21.2 steps 6-9: query provider, identify owned records, compare.
+	// Ownership keys are derived from the comment's JSON key-value pairs.
+	filter := buildOwnershipFilter(desired)
 	r.Logger.Information(fmt.Sprintf("Record %s: desired comment [Length: %d] → %s", recordID, len(desired.Comment), desired.Comment))
 	desired.DesiredFingerprint = fingerprint(desired)
 	existing, err := provider.ListRecords(ctx, filter)

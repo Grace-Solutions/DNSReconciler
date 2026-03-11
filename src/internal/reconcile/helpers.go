@@ -29,17 +29,32 @@ func fingerprint(r core.Record) string {
 }
 
 // buildOwnershipFilter creates a RecordFilter for the provider query.
-func buildOwnershipFilter(desired core.Record, nodeID string) core.RecordFilter {
+// The ownership map is derived from the desired record's comment field:
+// if the comment is valid JSON, its key-value pairs become the ownership
+// map used for matching. If the comment is empty or not JSON, no
+// ownership keys are set and matching falls through to name+type.
+func buildOwnershipFilter(desired core.Record) core.RecordFilter {
+	ownership := parseCommentAsOwnership(desired.Comment)
 	return core.RecordFilter{
-		Zone: desired.Zone,
-		Name: desired.Name,
-		Type: desired.Type,
-		Ownership: map[string]string{
-			"managed-by":         "dnsreconciler",
-			"node-id":            nodeID,
-			"record-template-id": desired.RecordTemplateID,
-		},
+		Zone:      desired.Zone,
+		Name:      desired.Name,
+		Type:      desired.Type,
+		Ownership: ownership,
 	}
+}
+
+// parseCommentAsOwnership attempts to parse the comment as a JSON object
+// and returns its key-value pairs as the ownership map. Returns nil if
+// the comment is empty or not valid JSON.
+func parseCommentAsOwnership(comment string) map[string]string {
+	if comment == "" {
+		return nil
+	}
+	var obj map[string]string
+	if err := json.Unmarshal([]byte(comment), &obj); err != nil {
+		return nil
+	}
+	return obj
 }
 
 // Ownership match method constants returned by findOwnedRecord.
@@ -119,116 +134,39 @@ func hasTagCaseInsensitive(tags []core.Tag, name, value string) bool {
 // comment field. Providers like Cloudflare enforce a 100-character limit.
 const maxCommentLength = 100
 
-// coreOwnershipKeys lists the ownership keys that are always generated
-// by buildOwnershipFilter. Used to distinguish user-supplied keys from
-// system keys during the truncation pass.
-var coreOwnershipKeys = map[string]bool{
-	"managed-by":         true,
-	"node-id":            true,
-	"record-template-id": true,
-}
-
-// buildOwnershipComment creates a JSON-structured comment that embeds
-// ownership metadata alongside an optional user-supplied note or custom
-// key-value pairs.
+// buildOwnershipComment normalises the user-supplied comment for use as
+// the DNS record's comment field. No system keys are injected — the
+// comment is exactly what the user specifies.
 //
-// If the user comment is a JSON object (single quotes are accepted and
-// converted to double quotes for convenience), its keys are merged into
-// the ownership map. This lets users add custom metadata without escaping:
+// Single quotes are converted to double quotes so users can write JSON
+// inside their JSON config without escaping:
 //
 //	config:  "comment": "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}"
-//	result:  {"managed-by":"dnsreconciler","node-id":"abc","record-template-id":"xyz","hostname":"myserver","nodeId":"n1"}
+//	result:  {"hostname":"myserver","nodeId":"ba9298a1c5b2..."}
 //
-// If the user comment is plain text, it is stored under the "note" key:
-//
-//	config:  "comment": "managed by automation"
-//	result:  {"managed-by":"dnsreconciler","node-id":"abc","record-template-id":"xyz","note":"managed by automation"}
-//
-// The final string is capped at maxCommentLength (100) characters. When
-// the full JSON exceeds this limit, fields are removed in priority order:
-//  1. "note" (plain-text fallback)
-//  2. User-supplied keys (anything not in coreOwnershipKeys)
-//  3. "managed-by" (always "dnsreconciler" — least unique)
-//  4. "record-template-id"
-//
-// "node-id" is never removed — it is the most unique identifier.
-func buildOwnershipComment(userComment string, ownership map[string]string) string {
-	obj := make(map[string]string, len(ownership)+4)
-	for k, v := range ownership {
-		obj[k] = v
-	}
-	if userComment != "" {
-		mergeUserComment(obj, userComment)
-	}
-	return marshalAndTruncate(obj)
-}
-
-// marshalAndTruncate serialises obj as JSON. If the result exceeds
-// maxCommentLength, it removes keys one at a time in priority order
-// until the string fits.
-func marshalAndTruncate(obj map[string]string) string {
-	data, err := json.Marshal(obj)
-	if err != nil {
+// If the result exceeds maxCommentLength (100 chars) it is truncated.
+// Plain-text comments are used as-is (truncated if necessary).
+func buildOwnershipComment(userComment string) string {
+	if userComment == "" {
 		return ""
 	}
-	if len(data) <= maxCommentLength {
-		return string(data)
+	// Normalise single quotes → double quotes for JSON convenience.
+	normalised := strings.ReplaceAll(userComment, "'", "\"")
+
+	// If it's valid JSON, re-marshal for a canonical form.
+	var obj map[string]string
+	if err := json.Unmarshal([]byte(normalised), &obj); err == nil {
+		data, err := json.Marshal(obj)
+		if err == nil {
+			normalised = string(data)
+		}
 	}
 
-	// Removal priority (first removed → least important).
-	// 1. "note"
-	if _, ok := obj["note"]; ok {
-		delete(obj, "note")
-		if s := tryMarshal(obj); len(s) <= maxCommentLength {
-			return s
-		}
+	// Enforce provider length limit.
+	if len(normalised) > maxCommentLength {
+		normalised = normalised[:maxCommentLength]
 	}
-	// 2. User-supplied keys (non-core, non-note).
-	for k := range obj {
-		if coreOwnershipKeys[k] {
-			continue
-		}
-		delete(obj, k)
-		if s := tryMarshal(obj); len(s) <= maxCommentLength {
-			return s
-		}
-	}
-	// 3. "managed-by"
-	delete(obj, "managed-by")
-	if s := tryMarshal(obj); len(s) <= maxCommentLength {
-		return s
-	}
-	// 4. "record-template-id"
-	delete(obj, "record-template-id")
-	return tryMarshal(obj) // node-id alone should always fit.
-}
-
-// tryMarshal is a convenience wrapper that returns "" on error.
-func tryMarshal(obj map[string]string) string {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
-
-// mergeUserComment attempts to parse the user comment as a JSON object.
-// Single quotes are converted to double quotes first so users can avoid
-// escaping in their JSON config files. If parsing succeeds, keys are
-// merged into obj (user keys do NOT overwrite ownership keys). If parsing
-// fails, the raw text is stored under the "note" key.
-func mergeUserComment(obj map[string]string, comment string) {
-	normalized := strings.ReplaceAll(comment, "'", "\"")
-	var userObj map[string]string
-	if err := json.Unmarshal([]byte(normalized), &userObj); err == nil {
-		for k, v := range userObj {
-			if _, exists := obj[k]; !exists {
-				obj[k] = v
-			}
-		}
-		return
-	}
-	obj["note"] = comment
+	return normalised
 }
 
 // matchOwnershipByCommentDetailed checks whether the comment contains the
