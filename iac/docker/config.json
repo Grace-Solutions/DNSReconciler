@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "providerDefaults": {
+    "cloudflare": {
+      "apiToken": "env:CF_API_TOKEN",
+      "zoneId": "env:CF_ZONE_ID",
+      "baseUrl": "https://api.cloudflare.com/client/v4"
+    },
+    "technitium": {
+      "apiToken": "env:TECH_API_TOKEN",
+      "baseUrl": "env:TECH_BASE_URL"
+    },
+    "powerdns": {
+      "apiKey": "env:PDNS_API_KEY",
+      "baseUrl": "env:PDNS_BASE_URL",
+      "serverId": "localhost"
+    }
+  },
+  "runtime": {
+    "reconcileIntervalSeconds": 120,
+    "statePath": "/state/state.json",
+    "cleanupOnShutdown": true,
+    "logLevel": "Information",
+    "dryRun": false
+  },
+  "network": {
+    "addressSources": [
+      {
+        "priority": 1,
+        "type": "publicIPv4",
+        "enabled": true
+      },
+      {
+        "priority": 2,
+        "type": "interfaceIPv4",
+        "enabled": true,
+        "interfaceName": "tailscale0",
+        "allowRanges": ["100.64.0.0/10"]
+      },
+      {
+        "priority": 3,
+        "type": "rfc1918IPv4",
+        "enabled": true
+      },
+      {
+        "priority": 4,
+        "type": "cgnatIPv4",
+        "enabled": true
+      }
+    ]
+  },
+  "defaults": {
+    "enabled": true,
+    "ownership": "perNode",
+    "ttl": 120,
+    "proxied": false,
+    "comment": "Managed by dnsreconciler on ${HOSTNAME}",
+    "tags": [
+      { "name": "managed-by", "value": "dnsreconciler" },
+      { "name": "node-id", "value": "${NODE_ID}" },
+      { "name": "node-hostname", "value": "${HOSTNAME}" }
+    ]
+  },
+  "records": [
+    {
+      "id": "public-api",
+      "enabled": true,
+      "provider": "cloudflare",
+      "zone": "example.com",
+      "type": "A",
+      "name": "api.example.com",
+      "content": "${SELECTED_IPV4}",
+      "tags": [
+        { "name": "service", "value": "api" }
+      ]
+    },
+    {
+      "id": "mesh-api",
+      "enabled": true,
+      "provider": "powerdns",
+      "zone": "mesh.example.internal",
+      "type": "A",
+      "name": "api.mesh.example.internal",
+      "content": "${SELECTED_IPV4}",
+      "addressSelection": {
+        "useGlobalDefaults": false,
+        "sources": [
+          {
+            "priority": 1,
+            "type": "interfaceIPv4",
+            "enabled": true,
+            "interfaceName": "tailscale0",
+            "allowRanges": ["100.64.0.0/10"]
+          },
+          {
+            "priority": 2,
+            "type": "rfc1918IPv4",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "internal-node",
+      "enabled": true,
+      "provider": "technitium",
+      "zone": "internal.example.local",
+      "type": "A",
+      "name": "${HOSTNAME}.internal.example.local",
+      "content": "${SELECTED_IPV4}"
+    }
+  ]
+}
+

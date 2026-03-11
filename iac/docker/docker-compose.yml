@@ -1,0 +1,23 @@
+services:
+  dnsreconciler:
+    build:
+      context: ../../
+      dockerfile: iac/docker/Dockerfile
+    image: gracesolutions/dnsreconciler:latest
+    container_name: dnsreconciler
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./config.json:/config/config.json:ro
+      - state-data:/state
+    # Uncomment to mount file-based secrets instead of using env vars:
+    # - /run/secrets:/run/secrets:ro
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+volumes:
+  state-data:
+
