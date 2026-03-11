@@ -30,8 +30,7 @@ go.work.sum
 # Build and release outputs
 Artifacts/*
 !Artifacts/.gitkeep
-Binaries/*
-!Binaries/.gitkeep
+
 Releases/*
 !Releases/.gitkeep
 
