@@ -25,7 +25,7 @@
             "baseUrl":      "env:TECH_BASE_URL",
             "zone":         "internal.example.local",
             "ttl":          120,
-            "comment":      "Managed by dnsreconciler on ${HOSTNAME}"
+            "comment":      "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}"
         }
     ],
 

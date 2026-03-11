@@ -27,7 +27,7 @@
             "zone":         "example.com",
             "ttl":          120,
             "proxied":      false,
-            "comment":      "Managed by dnsreconciler on ${HOSTNAME}",
+            "comment":      "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}",
             "tags": [
                 { "name": "managed-by", "value": "dnsreconciler" },
                 { "name": "node-id",    "value": "${NODE_ID}" }

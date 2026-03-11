@@ -26,7 +26,7 @@
             "serverId":     "localhost",
             "zone":         "mesh.example.internal",
             "ttl":          120,
-            "comment":      "Managed by dnsreconciler on ${HOSTNAME}"
+            "comment":      "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}"
         }
     ],
 

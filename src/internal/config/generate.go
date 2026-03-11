@@ -37,7 +37,7 @@ const defaultConfigJSON = `{
             "zone":         "example.com",
             "ttl":          120,
             "proxied":      false,
-            "comment":      "Managed by dnsreconciler on ${HOSTNAME}"
+            "comment":      "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}"
         }
     ],
 

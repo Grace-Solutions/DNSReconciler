@@ -29,6 +29,7 @@
             "zoneName":       "env:AZURE_ZONE_NAME",
             "zone":           "example.com",
             "ttl":            300,
+            "comment":        "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}",
             "tags": [
                 { "name": "managed-by", "value": "dnsreconciler" },
                 { "name": "node-id",    "value": "${NODE_ID}" }

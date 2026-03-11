@@ -26,7 +26,8 @@
             "hostedZoneId":    "env:AWS_HOSTED_ZONE_ID",
             "region":          "us-east-1",
             "zone":            "example.com",
-            "ttl":             300
+            "ttl":             300,
+            "comment":         "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}"
         }
     ],
 

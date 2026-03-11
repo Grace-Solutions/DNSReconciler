@@ -102,27 +102,52 @@ func hasTagCaseInsensitive(tags []core.Tag, name, value string) bool {
 }
 
 // buildOwnershipComment creates a JSON-structured comment that embeds
-// ownership metadata alongside an optional user-supplied note.
-// The resulting string is portable across all providers — it turns
-// the comment field into a structured tag-like store.
+// ownership metadata alongside an optional user-supplied note or custom
+// key-value pairs.
 //
-// Example output:
+// If the user comment is a JSON object (single quotes are accepted and
+// converted to double quotes for convenience), its keys are merged into
+// the ownership map. This lets users add custom metadata without escaping:
 //
-//	{"managed-by":"dnsreconciler","node-id":"abc","record-template-id":"xyz","note":"user text"}
+//	config:  "comment": "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}"
+//	result:  {"managed-by":"dnsreconciler","node-id":"abc","record-template-id":"xyz","hostname":"myserver","nodeId":"n1"}
+//
+// If the user comment is plain text, it is stored under the "note" key:
+//
+//	config:  "comment": "managed by automation"
+//	result:  {"managed-by":"dnsreconciler","node-id":"abc","record-template-id":"xyz","note":"managed by automation"}
 func buildOwnershipComment(userComment string, ownership map[string]string) string {
-	obj := make(map[string]string, len(ownership)+1)
+	obj := make(map[string]string, len(ownership)+4)
 	for k, v := range ownership {
 		obj[k] = v
 	}
 	if userComment != "" {
-		obj["note"] = userComment
+		mergeUserComment(obj, userComment)
 	}
 	data, err := json.Marshal(obj)
 	if err != nil {
-		// Should never happen with map[string]string, but fall back gracefully.
 		return userComment
 	}
 	return string(data)
+}
+
+// mergeUserComment attempts to parse the user comment as a JSON object.
+// Single quotes are converted to double quotes first so users can avoid
+// escaping in their JSON config files. If parsing succeeds, keys are
+// merged into obj (user keys do NOT overwrite ownership keys). If parsing
+// fails, the raw text is stored under the "note" key.
+func mergeUserComment(obj map[string]string, comment string) {
+	normalized := strings.ReplaceAll(comment, "'", "\"")
+	var userObj map[string]string
+	if err := json.Unmarshal([]byte(normalized), &userObj); err == nil {
+		for k, v := range userObj {
+			if _, exists := obj[k]; !exists {
+				obj[k] = v
+			}
+		}
+		return
+	}
+	obj["note"] = comment
 }
 
 // matchOwnershipByComment checks whether the comment contains the

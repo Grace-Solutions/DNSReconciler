@@ -27,7 +27,7 @@
             "zone":         "example.com",
             "ttl":          120,
             "proxied":      false,
-            "comment":      "Managed by dnsreconciler on ${HOSTNAME}",
+            "comment":      "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}",
             "tags": [
                 { "name": "managed-by",    "value": "dnsreconciler" },
                 { "name": "node-id",       "value": "${NODE_ID}" },
@@ -44,7 +44,7 @@
             "serverId":     "localhost",
             "zone":         "mesh.example.internal",
             "ttl":          120,
-            "comment":      "Managed by dnsreconciler on ${HOSTNAME}"
+            "comment":      "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}"
         },
         {
             "providerId":   "b5e82b02-32ba-48f7-b575-3a01940e7056",
@@ -55,7 +55,7 @@
             "baseUrl":      "env:TECH_BASE_URL",
             "zone":         "internal.example.local",
             "ttl":          120,
-            "comment":      "Managed by dnsreconciler on ${HOSTNAME}"
+            "comment":      "{'hostname': '${HOSTNAME}', 'nodeId': '${NODE_ID}'}"
         }
     ],
 
