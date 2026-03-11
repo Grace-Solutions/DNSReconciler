@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gracesolutions/dns-automatic-updater/internal/config"
 	"github.com/gracesolutions/dns-automatic-updater/internal/core"
@@ -125,30 +126,46 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 func (r *Reconciler) performAction(ctx context.Context, provider core.Provider, desired core.Record, existing []core.Record, recordID string, st *state.File, ownership map[string]string) Result {
 	owned := findOwnedRecord(existing, desired, ownership)
 
-	if owned == nil {
-		// Create
-		r.Logger.Information(fmt.Sprintf("Record %s: creating", recordID))
-		if r.DryRun {
-			r.Logger.Information(fmt.Sprintf("Record %s: [dry-run] would create", recordID))
-			return Result{RecordID: recordID, Action: ActionCreate}
-		}
-		created, err := provider.CreateRecord(ctx, desired)
-		if err != nil {
-			r.Logger.Error(fmt.Sprintf("Record %s: create failed: %s", recordID, err))
-			return Result{RecordID: recordID, Action: ActionCreate, Error: err}
-		}
-		updateState(st, recordID, created, desired.DesiredFingerprint, desired.Content)
-		return Result{RecordID: recordID, Action: ActionCreate}
+	if owned != nil {
+		return r.reconcileExisting(ctx, provider, desired, owned, recordID, st)
 	}
 
-	// Compare fingerprint
-	if desired.DesiredFingerprint == st.Records[recordID].DesiredFingerprint {
-		r.Logger.Debug(fmt.Sprintf("Record %s: no change", recordID))
+	// No existing record found — attempt to create.
+	r.Logger.Information(fmt.Sprintf("Record %s: creating", recordID))
+	if r.DryRun {
+		r.Logger.Information(fmt.Sprintf("Record %s: [dry-run] would create", recordID))
+		return Result{RecordID: recordID, Action: ActionCreate}
+	}
+	created, err := provider.CreateRecord(ctx, desired)
+	if err != nil {
+		// Safety net: if the provider reports the record already exists
+		// (e.g. Cloudflare error 81058), handle it as a reconciliation
+		// candidate instead of a hard error.
+		if isDuplicateRecordError(err) {
+			r.Logger.Information(fmt.Sprintf("Record %s: duplicate detected, reconciling existing record", recordID))
+			return r.handleDuplicateOnCreate(ctx, provider, desired, recordID, st, ownership)
+		}
+		r.Logger.Error(fmt.Sprintf("Record %s: create failed: %s", recordID, err))
+		return Result{RecordID: recordID, Action: ActionCreate, Error: err}
+	}
+	updateState(st, recordID, created, desired.DesiredFingerprint, desired.Content)
+	return Result{RecordID: recordID, Action: ActionCreate}
+}
+
+// reconcileExisting handles the case where an existing record was found.
+// If the content matches, it logs and skips. If content differs, it updates.
+func (r *Reconciler) reconcileExisting(ctx context.Context, provider core.Provider, desired core.Record, owned *core.Record, recordID string, st *state.File) Result {
+	// Content-based shortcut: if the record already has the correct content,
+	// log and skip regardless of fingerprint state (handles fresh installs,
+	// lost state, or records adopted via name+type fallback).
+	if strings.EqualFold(owned.Content, desired.Content) {
+		r.Logger.Information(fmt.Sprintf("Record %s: already exists with correct content, skipping", recordID))
+		updateState(st, recordID, *owned, desired.DesiredFingerprint, desired.Content)
 		return Result{RecordID: recordID, Action: ActionNoop}
 	}
 
-	// Update
-	r.Logger.Information(fmt.Sprintf("Record %s: updating", recordID))
+	// Content differs — update the record.
+	r.Logger.Information(fmt.Sprintf("Record %s: content differs (have=%s want=%s), updating", recordID, owned.Content, desired.Content))
 	desired.ProviderRecordID = owned.ProviderRecordID
 	if r.DryRun {
 		r.Logger.Information(fmt.Sprintf("Record %s: [dry-run] would update", recordID))
@@ -161,5 +178,37 @@ func (r *Reconciler) performAction(ctx context.Context, provider core.Provider, 
 	}
 	updateState(st, recordID, updated, desired.DesiredFingerprint, desired.Content)
 	return Result{RecordID: recordID, Action: ActionUpdate}
+}
+
+// handleDuplicateOnCreate re-queries the provider after a duplicate-create
+// error, finds the existing record, and reconciles it (skip or update).
+func (r *Reconciler) handleDuplicateOnCreate(ctx context.Context, provider core.Provider, desired core.Record, recordID string, st *state.File, ownership map[string]string) Result {
+	filter := core.RecordFilter{Zone: desired.Zone, Name: desired.Name, Type: desired.Type}
+	records, err := provider.ListRecords(ctx, filter)
+	if err != nil {
+		r.Logger.Error(fmt.Sprintf("Record %s: re-query after duplicate failed: %s", recordID, err))
+		return Result{RecordID: recordID, Action: ActionCreate, Error: err}
+	}
+	owned := findOwnedRecord(records, desired, ownership)
+	if owned == nil && len(records) > 0 {
+		// Use first name+type match as candidate.
+		owned = &records[0]
+	}
+	if owned == nil {
+		err := fmt.Errorf("record exists at provider but could not be located on re-query")
+		r.Logger.Error(fmt.Sprintf("Record %s: %s", recordID, err))
+		return Result{RecordID: recordID, Action: ActionCreate, Error: err}
+	}
+	return r.reconcileExisting(ctx, provider, desired, owned, recordID, st)
+}
+
+// isDuplicateRecordError returns true when the error indicates that
+// the provider already has an identical record (e.g. Cloudflare 81058).
+func isDuplicateRecordError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "already exists") || strings.Contains(msg, "duplicate")
 }
 

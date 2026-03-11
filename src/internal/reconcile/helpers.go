@@ -45,13 +45,18 @@ func buildOwnershipFilter(desired core.Record, nodeID string) core.RecordFilter 
 // It matches by name+type and then checks ownership via tags or comment
 // using case-insensitive matching.
 //
-// Strategy:
+// Strategy (in priority order):
 //  1. If the existing record has tags, check whether every ownership
 //     key-value pair appears in the tags (case-insensitive).
 //  2. If tag matching fails (or no tags present), fall back to the
 //     comment field and check whether every ownership value appears
 //     in the comment text (case-insensitive regex).
+//  3. If neither tag nor comment matched, fall back to name+type match.
+//     This ensures that a record already present on the provider (even
+//     without ownership metadata) is treated as a reconciliation
+//     candidate rather than triggering a duplicate-create error.
 func findOwnedRecord(existing []core.Record, desired core.Record, ownership map[string]string) *core.Record {
+	var nameTypeCandidate *core.Record
 	for i, rec := range existing {
 		if !strings.EqualFold(rec.Name, desired.Name) || !strings.EqualFold(rec.Type, desired.Type) {
 			continue
@@ -62,8 +67,12 @@ func findOwnedRecord(existing []core.Record, desired core.Record, ownership map[
 		if matchOwnershipByComment(rec.Comment, ownership) {
 			return &existing[i]
 		}
+		// Track first name+type match as fallback candidate.
+		if nameTypeCandidate == nil {
+			nameTypeCandidate = &existing[i]
+		}
 	}
-	return nil
+	return nameTypeCandidate
 }
 
 // matchOwnershipByTags returns true when every key-value pair in the
