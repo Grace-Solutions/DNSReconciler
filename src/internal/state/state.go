@@ -37,6 +37,19 @@ type CleanupItem struct {
 	ProviderRecordID string `json:"providerRecordId,omitempty"`
 }
 
+// PruneOrphans removes state entries whose record template ID no longer
+// exists in the current config. Returns the number of entries removed.
+func (f *File) PruneOrphans(activeIDs map[string]struct{}) int {
+	pruned := 0
+	for id := range f.Records {
+		if _, ok := activeIDs[id]; !ok {
+			delete(f.Records, id)
+			pruned++
+		}
+	}
+	return pruned
+}
+
 type Store interface {
 	Load(ctx context.Context) (File, error)
 	Save(ctx context.Context, state File) error

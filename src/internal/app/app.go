@@ -132,6 +132,15 @@ func (a Application) run(command Command) error {
 
 		stats, _ := reconciler.ReconcileAll(ctx, mergedRecords, &st)
 
+		// Prune orphaned state entries for records no longer in config
+		activeIDs := make(map[string]struct{}, len(mergedRecords))
+		for _, r := range mergedRecords {
+			activeIDs[r.ID] = struct{}{}
+		}
+		if pruned := st.PruneOrphans(activeIDs); pruned > 0 {
+			a.logger.Information(fmt.Sprintf("Pruned %d orphaned state entries", pruned))
+		}
+
 		// §21.1 step 10: persist state
 		st.NodeID = snap.NodeID
 		st.Hostname = snap.Hostname
