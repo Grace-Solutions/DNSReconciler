@@ -12,7 +12,6 @@
 
     "runtime": {
         "reconcileIntervalSeconds": 120,
-        "statePath":                "/state/state.json",
         "cleanupOnShutdown":        true,
         "logLevel":                 "Information",
         "dryRun":                   false
@@ -20,8 +19,9 @@
 
     "network": {
         "addressSources": [
-            { "priority": 1, "type": "publicIPv4",   "enabled": true },
-            { "priority": 2, "type": "rfc1918IPv4",  "enabled": true }
+            { "priority": 1, "type": "publicIPv4",  "enabled": true },
+            { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
+            { "priority": 3, "type": "rfc1918IPv4",  "enabled": true }
         ]
     },
 
@@ -34,13 +34,22 @@
 
     "records": [
         {
-            "id":       "aws-host",
+            "id":       "aws-host-v4",
             "enabled":  true,
             "provider": "route53",
             "zone":     "example.com",
             "type":     "A",
             "name":     "${HOSTNAME}.example.com",
             "content":  "${SELECTED_IPV4}"
+        },
+        {
+            "id":       "aws-host-v6",
+            "enabled":  false,
+            "provider": "route53",
+            "zone":     "example.com",
+            "type":     "AAAA",
+            "name":     "${HOSTNAME}.example.com",
+            "content":  "${SELECTED_IPV6}"
         }
     ]
 }

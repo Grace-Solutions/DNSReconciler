@@ -10,7 +10,6 @@
 
     "runtime": {
         "reconcileIntervalSeconds": 120,
-        "statePath":                "/state/state.json",
         "cleanupOnShutdown":        true,
         "logLevel":                 "Information",
         "dryRun":                   false
@@ -18,7 +17,9 @@
 
     "network": {
         "addressSources": [
-            { "priority": 1, "type": "rfc1918IPv4",  "enabled": true }
+            { "priority": 1, "type": "publicIPv4",  "enabled": true },
+            { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
+            { "priority": 3, "type": "rfc1918IPv4",  "enabled": true }
         ]
     },
 
@@ -32,13 +33,22 @@
 
     "records": [
         {
-            "id":       "internal-host",
+            "id":       "internal-host-v4",
             "enabled":  true,
             "provider": "technitium",
             "zone":     "internal.example.local",
             "type":     "A",
             "name":     "${HOSTNAME}.internal.example.local",
             "content":  "${SELECTED_IPV4}"
+        },
+        {
+            "id":       "internal-host-v6",
+            "enabled":  false,
+            "provider": "technitium",
+            "zone":     "internal.example.local",
+            "type":     "AAAA",
+            "name":     "${HOSTNAME}.internal.example.local",
+            "content":  "${SELECTED_IPV6}"
         }
     ]
 }

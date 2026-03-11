@@ -11,7 +11,6 @@
 
     "runtime": {
         "reconcileIntervalSeconds": 120,
-        "statePath":                "/state/state.json",
         "cleanupOnShutdown":        true,
         "logLevel":                 "Information",
         "dryRun":                   false
@@ -19,7 +18,9 @@
 
     "network": {
         "addressSources": [
-            { "priority": 1, "type": "rfc1918IPv4",  "enabled": true }
+            { "priority": 1, "type": "publicIPv4",  "enabled": true },
+            { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
+            { "priority": 3, "type": "rfc1918IPv4",  "enabled": true }
         ]
     },
 
@@ -33,13 +34,22 @@
 
     "records": [
         {
-            "id":       "mesh-node",
+            "id":       "mesh-node-v4",
             "enabled":  true,
             "provider": "powerdns",
             "zone":     "mesh.example.internal",
             "type":     "A",
             "name":     "${HOSTNAME}.mesh.example.internal",
             "content":  "${SELECTED_IPV4}"
+        },
+        {
+            "id":       "mesh-node-v6",
+            "enabled":  false,
+            "provider": "powerdns",
+            "zone":     "mesh.example.internal",
+            "type":     "AAAA",
+            "name":     "${HOSTNAME}.mesh.example.internal",
+            "content":  "${SELECTED_IPV6}"
         }
     ]
 }
