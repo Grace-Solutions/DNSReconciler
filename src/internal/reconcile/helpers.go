@@ -248,25 +248,31 @@ func matchOwnershipByCommentDetailed(comment string, ownership map[string]string
 }
 
 // matchOwnershipByCommentJSON parses the comment as a JSON object and
-// checks whether every ownership key-value pair is present (case-insensitive).
+// checks ownership key-value pairs (case-insensitive). Keys that are
+// present in the JSON must match their expected value; keys that are
+// absent are skipped (they may have been removed by the 100-char
+// truncation pass). At least one key must match to avoid false positives.
 func matchOwnershipByCommentJSON(comment string, ownership map[string]string) bool {
 	var obj map[string]string
 	if err := json.Unmarshal([]byte(comment), &obj); err != nil {
 		return false
 	}
+	matched := 0
 	for key, val := range ownership {
-		found := false
+		// Look for this ownership key in the JSON object.
 		for k, v := range obj {
-			if strings.EqualFold(k, key) && strings.EqualFold(v, val) {
-				found = true
+			if strings.EqualFold(k, key) {
+				// Key is present — value must match.
+				if !strings.EqualFold(v, val) {
+					return false
+				}
+				matched++
 				break
 			}
 		}
-		if !found {
-			return false
-		}
+		// Key absent from JSON → skip (may have been truncated).
 	}
-	return true
+	return matched > 0
 }
 
 // matchOwnershipByCommentRegex searches for each ownership value in the
