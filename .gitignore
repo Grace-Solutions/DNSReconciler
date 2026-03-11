@@ -8,6 +8,9 @@
 *.so
 *.dylib
 
+# Allow published binaries
+!Binaries/*.exe
+
 # Test binary, built with `go test -c`
 *.test
 
