@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/signal"
 	"runtime"
+	"syscall"
 
 	"github.com/gracesolutions/dns-automatic-updater/internal/address"
 	"github.com/gracesolutions/dns-automatic-updater/internal/config"
@@ -16,6 +18,7 @@ import (
 	"github.com/gracesolutions/dns-automatic-updater/internal/provider/technitium"
 	"github.com/gracesolutions/dns-automatic-updater/internal/reconcile"
 	"github.com/gracesolutions/dns-automatic-updater/internal/runtimectx"
+	"github.com/gracesolutions/dns-automatic-updater/internal/scheduler"
 	"github.com/gracesolutions/dns-automatic-updater/internal/service"
 	"github.com/gracesolutions/dns-automatic-updater/internal/state"
 )
@@ -63,8 +66,6 @@ func (a Application) Run(args []string) error {
 }
 
 func (a Application) run(command Command) error {
-	ctx := context.Background()
-
 	// §21.1 steps 1-2: load and validate config
 	cfg, err := config.Load(command.ConfigPath)
 	if err != nil {
@@ -80,52 +81,77 @@ func (a Application) run(command Command) error {
 		storePath = command.OverrideState
 	}
 	store := state.JSONStore{Path: storePath}
-	st, err := store.Load(ctx)
-	if err != nil {
-		return err
-	}
-	a.logger.Information("Configuration and local state loaded successfully.")
 
-	// §21.1 step 5: resolve runtime context
-	rtResolver := runtimectx.NewDefaultResolver(a.logger, command.NodeID)
-	snap, err := rtResolver.Resolve(ctx)
-	if err != nil {
-		return fmt.Errorf("runtime context resolution failed: %w", err)
-	}
-
-	// §21.1 step 7: merge defaults
-	mergedRecords := config.MergeAllDefaults(&cfg)
-
-	// §21.1 steps 6, 8-9: resolve addresses, expand, reconcile
-	addrResolver := address.NewDefaultResolver(a.logger)
+	// Build providers once (§9)
 	providers := a.buildProviderMap(cfg)
 
-	reconciler := reconcile.Reconciler{
-		Logger:          a.logger,
-		Providers:       providers,
-		AddressResolver: addrResolver,
-		Snapshot:        snap,
-		GlobalSources:   cfg.Network.AddressSources,
-		DryRun:          cfg.Runtime.DryRun,
+	// reconcileOnce performs a single reconciliation pass (§21.1 steps 5-10).
+	reconcileOnce := func(ctx context.Context) error {
+		st, err := store.Load(ctx)
+		if err != nil {
+			return err
+		}
+
+		// §21.1 step 5: resolve runtime context
+		rtResolver := runtimectx.NewDefaultResolver(a.logger, command.NodeID)
+		snap, err := rtResolver.Resolve(ctx)
+		if err != nil {
+			return fmt.Errorf("runtime context resolution failed: %w", err)
+		}
+
+		// §21.1 step 7: merge defaults
+		mergedRecords := config.MergeAllDefaults(&cfg)
+
+		// §21.1 steps 6, 8-9: resolve addresses, expand, reconcile
+		addrResolver := address.NewDefaultResolver(a.logger)
+
+		reconciler := reconcile.Reconciler{
+			Logger:          a.logger,
+			Providers:       providers,
+			AddressResolver: addrResolver,
+			Snapshot:        snap,
+			GlobalSources:   cfg.Network.AddressSources,
+			DryRun:          cfg.Runtime.DryRun,
+		}
+
+		stats, _ := reconciler.ReconcileAll(ctx, mergedRecords, &st)
+
+		// §21.1 step 10: persist state
+		st.NodeID = snap.NodeID
+		st.Hostname = snap.Hostname
+		st.PublicIPv4Last = snap.PublicIPv4
+		st.PublicIPv6Last = snap.PublicIPv6
+		if err := store.Save(ctx, st); err != nil {
+			return fmt.Errorf("state save failed: %w", err)
+		}
+
+		if stats.Errors > 0 {
+			a.logger.Warning(fmt.Sprintf("Reconciliation completed with %d error(s)", stats.Errors))
+		}
+		return nil
 	}
 
-	stats, _ := reconciler.ReconcileAll(ctx, mergedRecords, &st)
-
-	// §21.1 step 10: persist state
-	st.NodeID = snap.NodeID
-	st.Hostname = snap.Hostname
-	st.PublicIPv4Last = snap.PublicIPv4
-	st.PublicIPv6Last = snap.PublicIPv6
-	if err := store.Save(ctx, st); err != nil {
-		return fmt.Errorf("state save failed: %w", err)
+	// §25: single-pass mode vs continuous scheduler
+	if command.Once {
+		a.logger.Information("Running single reconciliation pass (--once)")
+		return reconcileOnce(context.Background())
 	}
 
-	if stats.Errors > 0 {
-		a.logger.Warning(fmt.Sprintf("Reconciliation completed with %d error(s)", stats.Errors))
-	}
+	// Continuous mode: use scheduler with signal-driven shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	// §21.1 step 11: scheduled loop will be implemented in a future milestone
-	a.logger.Information("Single reconciliation pass complete.")
+	sched := scheduler.New(a.logger, scheduler.Config{
+		IntervalSeconds: cfg.Runtime.ReconcileIntervalSeconds,
+		JitterPercent:   10,
+	}, reconcileOnce)
+
+	a.logger.Information(fmt.Sprintf("Starting scheduler (interval=%ds)", cfg.Runtime.ReconcileIntervalSeconds))
+	err = sched.Run(ctx)
+	if err != nil && err != context.Canceled {
+		return err
+	}
+	a.logger.Information("Scheduler stopped gracefully")
 	return nil
 }
 
