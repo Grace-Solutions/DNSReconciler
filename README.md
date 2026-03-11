@@ -428,11 +428,8 @@ iac/docker/
 ├── .env.example           # Non-secret environment template
 ├── config/                # Bind-mounted as /config in the container
 │   └── config.json        # Your configuration file
-├── secrets/               # Docker secrets (gitignored except .gitignore)
-│   ├── cf_api_token       # Cloudflare API token
-│   ├── cf_zone_id         # Cloudflare zone ID
-│   ├── tech_api_token     # Technitium API token
-│   └── pdns_api_key       # PowerDNS API key
+├── secrets/               # Docker secrets (gitignored) — use any filenames you want
+│   └── (your secret files)   # Referenced via file:/run/secrets/<name> in config
 ├── state/                 # Bind-mounted as /state in the container
 ├── docker-compose.yml     # Service definition
 ├── Dockerfile             # Multi-stage build
@@ -453,27 +450,25 @@ docker compose up --build -d
 
 ### Environment variables
 
-All variables in `.env` are injected into the container and can be referenced in `config.json` using `env:VAR_NAME` syntax.
+All variables in `.env` are injected into the container and can be referenced in `config.json` using `env:VAR_NAME` syntax. The variable names are **not fixed** — you can use any name you like as long as it matches the `env:` reference in your config. The table below shows common conventions, but they are just examples:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PUID` | `1000` | Container user ID — match your host user |
 | `PGID` | `1000` | Container group ID — match your host group |
 | `RECONCILE_INTERVAL_SECONDS` | *(unset)* | Override the config file's interval |
-| `CF_API_TOKEN` | | Cloudflare API token |
-| `CF_ZONE_ID` | | Cloudflare zone ID |
-| `TECH_API_TOKEN` | | Technitium API token |
-| `TECH_BASE_URL` | `http://technitium:5380` | Technitium server URL |
-| `PDNS_API_KEY` | | PowerDNS API key |
-| `PDNS_BASE_URL` | `http://powerdns:8081` | PowerDNS server URL |
+
+For example, if your `.env` contains `MY_CF_TOKEN=sk-abc123`, reference it in config as `"apiToken": "env:MY_CF_TOKEN"`. This works for every credential field across all providers — Cloudflare, Technitium, PowerDNS, Route53, and Azure.
 
 ### Docker secrets (optional)
 
-For enhanced security, you can switch from env vars to Docker secrets. Uncomment the `secrets` blocks in `docker-compose.yml`, populate the files in `secrets/`, and update `config.json` to use `file:` syntax:
+The same flexibility applies to Docker secrets. Secret file names are **not prescribed** — use any name you want, mount them however you prefer, and reference the path in your config with `file:` syntax:
 
 ```json
-"apiToken": "file:/run/secrets/cf_api_token"
+"clientSecret": "file:/run/secrets/my_azure_secret"
 ```
+
+For example, you could create a secret file called `route53_key` and reference it as `"secretAccessKey": "file:/run/secrets/route53_key"`. Any credential field on any provider supports this.
 
 The `secrets/` directory is gitignored — secret files never enter version control.
 
