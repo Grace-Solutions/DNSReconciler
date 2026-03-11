@@ -82,6 +82,17 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 		tags[i] = core.Tag{Name: t.Name, Value: vr.Value}
 	}
 
+	// Enforce capability gating: strip tags if the provider does not support them.
+	caps := provider.Capabilities()
+	if !caps.SupportsStructuredTags && len(tags) > 0 {
+		r.Logger.Debug(fmt.Sprintf("Record %s: provider does not support tags, stripping %d tag(s)", recordID, len(tags)))
+		tags = nil
+	}
+
+	// Log the fully expanded record state for visibility.
+	r.Logger.Information(fmt.Sprintf("Record %s: expanded → Type=%s Name=%s Content=%s Zone=%s TTL=%d Tags=%d",
+		recordID, tmpl.Type, name, content, tmpl.Zone, ttl, len(tags)))
+
 	desired := core.Record{
 		Provider:         tmpl.ProviderID,
 		Zone:             tmpl.Zone,
