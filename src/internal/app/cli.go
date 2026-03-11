@@ -21,6 +21,7 @@ type Command struct {
 	Kind          CommandKind
 	ConfigPath    string
 	OverrideState string
+	NodeID        string
 	ServiceAction service.Action
 	ServiceName   string
 }
@@ -42,10 +43,11 @@ func parseRun(args []string) (Command, error) {
 	fs.SetOutput(io.Discard)
 	configPath := fs.String("config", "./config.json", "Path to the JSON configuration file.")
 	statePath := fs.String("state", "", "Override the configured state file path.")
+	nodeID := fs.String("node-id", "", "Explicit node identity (§11.4).")
 	if err := fs.Parse(args); err != nil {
 		return Command{}, err
 	}
-	return Command{Kind: CommandRun, ConfigPath: *configPath, OverrideState: *statePath}, nil
+	return Command{Kind: CommandRun, ConfigPath: *configPath, OverrideState: *statePath, NodeID: *nodeID}, nil
 }
 
 func parseService(args []string) (Command, error) {

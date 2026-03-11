@@ -6,8 +6,12 @@ import (
 	"io"
 	"runtime"
 
+	"github.com/gracesolutions/dns-automatic-updater/internal/address"
 	"github.com/gracesolutions/dns-automatic-updater/internal/config"
+	"github.com/gracesolutions/dns-automatic-updater/internal/core"
 	"github.com/gracesolutions/dns-automatic-updater/internal/logging"
+	"github.com/gracesolutions/dns-automatic-updater/internal/reconcile"
+	"github.com/gracesolutions/dns-automatic-updater/internal/runtimectx"
 	"github.com/gracesolutions/dns-automatic-updater/internal/service"
 	"github.com/gracesolutions/dns-automatic-updater/internal/state"
 )
@@ -55,22 +59,78 @@ func (a Application) Run(args []string) error {
 }
 
 func (a Application) run(command Command) error {
+	ctx := context.Background()
+
+	// §21.1 steps 1-2: load and validate config
 	cfg, err := config.Load(command.ConfigPath)
 	if err != nil {
 		return err
 	}
+
+	// §21.1 step 3: initialize centralized logger
 	a.logger.SetLevel(logging.ParseLevel(cfg.Runtime.LogLevel))
+
+	// §21.1 step 4: load local state
 	storePath := cfg.Runtime.StatePath
 	if command.OverrideState != "" {
 		storePath = command.OverrideState
 	}
 	store := state.JSONStore{Path: storePath}
-	if _, err := store.Load(context.Background()); err != nil {
+	st, err := store.Load(ctx)
+	if err != nil {
 		return err
 	}
 	a.logger.Information("Configuration and local state loaded successfully.")
-	a.logger.Information("Bootstrap foundation is ready; reconciliation engine implementation is the next step.")
+
+	// §21.1 step 5: resolve runtime context
+	rtResolver := runtimectx.NewDefaultResolver(a.logger, command.NodeID)
+	snap, err := rtResolver.Resolve(ctx)
+	if err != nil {
+		return fmt.Errorf("runtime context resolution failed: %w", err)
+	}
+
+	// §21.1 step 7: merge defaults
+	mergedRecords := config.MergeAllDefaults(&cfg)
+
+	// §21.1 steps 6, 8-9: resolve addresses, expand, reconcile
+	addrResolver := address.NewDefaultResolver(a.logger)
+	providers := a.buildProviderMap(cfg)
+
+	reconciler := reconcile.Reconciler{
+		Logger:          a.logger,
+		Providers:       providers,
+		AddressResolver: addrResolver,
+		Snapshot:        snap,
+		GlobalSources:   cfg.Network.AddressSources,
+		DryRun:          cfg.Runtime.DryRun,
+	}
+
+	stats, _ := reconciler.ReconcileAll(ctx, mergedRecords, &st)
+
+	// §21.1 step 10: persist state
+	st.NodeID = snap.NodeID
+	st.Hostname = snap.Hostname
+	st.PublicIPv4Last = snap.PublicIPv4
+	st.PublicIPv6Last = snap.PublicIPv6
+	if err := store.Save(ctx, st); err != nil {
+		return fmt.Errorf("state save failed: %w", err)
+	}
+
+	if stats.Errors > 0 {
+		a.logger.Warning(fmt.Sprintf("Reconciliation completed with %d error(s)", stats.Errors))
+	}
+
+	// §21.1 step 11: scheduled loop will be implemented in a future milestone
+	a.logger.Information("Single reconciliation pass complete.")
 	return nil
+}
+
+// buildProviderMap returns the registered provider map. Provider implementations
+// will be added in subsequent milestones; for now returns an empty map.
+func (a Application) buildProviderMap(cfg config.Config) map[string]core.Provider {
+	// Placeholder — provider implementations (Cloudflare, Technitium, PowerDNS) will be
+	// registered here once they are built.
+	return map[string]core.Provider{}
 }
 
 func (a Application) handleService(command Command) error {
