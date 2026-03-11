@@ -2,16 +2,16 @@
   "version": 1,
   "providerDefaults": {
     "cloudflare": {
-      "apiToken": "file:/run/secrets/cf_api_token",
-      "zoneId": "file:/run/secrets/cf_zone_id",
+      "apiToken": "env:CF_API_TOKEN",
+      "zoneId": "env:CF_ZONE_ID",
       "baseUrl": "https://api.cloudflare.com/client/v4"
     },
     "technitium": {
-      "apiToken": "file:/run/secrets/tech_api_token",
+      "apiToken": "env:TECH_API_TOKEN",
       "baseUrl": "env:TECH_BASE_URL"
     },
     "powerdns": {
-      "apiKey": "file:/run/secrets/pdns_api_key",
+      "apiKey": "env:PDNS_API_KEY",
       "baseUrl": "env:PDNS_BASE_URL",
       "serverId": "localhost"
     }

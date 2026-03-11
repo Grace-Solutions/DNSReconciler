@@ -16,8 +16,10 @@ import (
 	"github.com/gracesolutions/dns-automatic-updater/internal/core"
 	"github.com/gracesolutions/dns-automatic-updater/internal/logging"
 	"github.com/gracesolutions/dns-automatic-updater/internal/provider"
+	"github.com/gracesolutions/dns-automatic-updater/internal/provider/azure"
 	"github.com/gracesolutions/dns-automatic-updater/internal/provider/cloudflare"
 	"github.com/gracesolutions/dns-automatic-updater/internal/provider/powerdns"
+	"github.com/gracesolutions/dns-automatic-updater/internal/provider/route53"
 	"github.com/gracesolutions/dns-automatic-updater/internal/provider/technitium"
 	"github.com/gracesolutions/dns-automatic-updater/internal/reconcile"
 	"github.com/gracesolutions/dns-automatic-updater/internal/runtimectx"
@@ -192,6 +194,8 @@ func (a Application) buildProviderMap(cfg config.Config) map[string]core.Provide
 	registry.Register("cloudflare", cloudflare.New)
 	registry.Register("technitium", technitium.New)
 	registry.Register("powerdns", powerdns.New)
+	registry.Register("route53", route53.New)
+	registry.Register("azure", azure.New)
 
 	// Collect unique provider names referenced by records
 	needed := map[string]bool{}

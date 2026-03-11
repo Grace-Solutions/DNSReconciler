@@ -13,29 +13,46 @@ services:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - RECONCILE_INTERVAL_SECONDS=${RECONCILE_INTERVAL_SECONDS:-}
+      - CF_API_TOKEN=${CF_API_TOKEN:-}
+      - CF_ZONE_ID=${CF_ZONE_ID:-}
+      - TECH_API_TOKEN=${TECH_API_TOKEN:-}
+      - TECH_BASE_URL=${TECH_BASE_URL:-}
+      - PDNS_API_KEY=${PDNS_API_KEY:-}
+      - PDNS_BASE_URL=${PDNS_BASE_URL:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET:-}
+      - AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-}
     volumes:
       - ./config:/config
       - ./state:/state
-    secrets:
-      - cf_api_token
-      - cf_zone_id
-      - tech_api_token
-      - pdns_api_key
+    # --- Optional: Docker secrets ---
+    # Uncomment below to use file-based secrets instead of env vars.
+    # Place each credential in its own file under secrets/ and
+    # reference them in config.json as: "file:/run/secrets/cf_api_token"
+    #
+    # secrets:
+    #   - cf_api_token
+    #   - cf_zone_id
+    #   - tech_api_token
+    #   - pdns_api_key
     deploy:
       resources:
         limits:
           memory: 64M
 
-# Docker secrets — create these files alongside docker-compose.yml
-# and populate them with your real credentials. They are mounted
-# read-only at /run/secrets/<name> inside the container.
-# Reference them in config.json as: "file:/run/secrets/cf_api_token"
-secrets:
-  cf_api_token:
-    file: ./secrets/cf_api_token
-  cf_zone_id:
-    file: ./secrets/cf_zone_id
-  tech_api_token:
-    file: ./secrets/tech_api_token
-  pdns_api_key:
-    file: ./secrets/pdns_api_key
+# --- Optional: Docker secrets definitions ---
+# Uncomment to enable file-based secrets (see secrets/ directory).
+#
+# secrets:
+#   cf_api_token:
+#     file: ./secrets/cf_api_token
+#   cf_zone_id:
+#     file: ./secrets/cf_zone_id
+#   tech_api_token:
+#     file: ./secrets/tech_api_token
+#   pdns_api_key:
+#     file: ./secrets/pdns_api_key

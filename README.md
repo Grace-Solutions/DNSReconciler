@@ -452,50 +452,38 @@ iac/docker/
 ```bash
 cd iac/docker
 cp .env.example .env
-# Edit .env — set PUID, PGID, and non-secret URLs
-
-# Populate secrets (one credential per file, no trailing newline)
-echo -n "your-cloudflare-token" > secrets/cf_api_token
-echo -n "your-zone-id"         > secrets/cf_zone_id
-echo -n "your-tech-token"      > secrets/tech_api_token
-echo -n "your-pdns-key"        > secrets/pdns_api_key
-
+# Edit .env — set PUID, PGID, and provider credentials
 # Edit config/config.json — or let it auto-generate on first run
 docker compose up --build -d
 ```
 
 > **Docker is the service manager.** The container runs the binary directly in a reconciliation loop — there is no `service install`. The `restart: unless-stopped` policy keeps it running across reboots, effectively acting as the service supervisor.
 
-### Docker secrets
-
-Credentials are managed via native Docker secrets. Each secret is a plain file in `secrets/` that gets mounted read-only at `/run/secrets/<name>` inside the container.
-
-Reference them in `config.json` using the `file:` prefix:
-
-```json
-"apiToken": "file:/run/secrets/cf_api_token"
-```
-
-| Secret file | Used by | Config field |
-|-------------|---------|--------------|
-| `secrets/cf_api_token` | Cloudflare | `providerDefaults.cloudflare.apiToken` |
-| `secrets/cf_zone_id` | Cloudflare | `providerDefaults.cloudflare.zoneId` |
-| `secrets/tech_api_token` | Technitium | `providerDefaults.technitium.apiToken` |
-| `secrets/pdns_api_key` | PowerDNS | `providerDefaults.powerdns.apiKey` |
-
-The `secrets/` directory is gitignored — only the `.gitignore` itself is tracked. Secret files never enter version control.
-
 ### Environment variables
 
-Non-secret configuration (URLs, IDs, intervals) is set in `.env` and referenced via `env:VAR_NAME` in `config.json`.
+All variables in `.env` are injected into the container and can be referenced in `config.json` using `env:VAR_NAME` syntax.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PUID` | `1000` | Container user ID — match your host user |
 | `PGID` | `1000` | Container group ID — match your host group |
 | `RECONCILE_INTERVAL_SECONDS` | *(unset)* | Override the config file's interval |
+| `CF_API_TOKEN` | | Cloudflare API token |
+| `CF_ZONE_ID` | | Cloudflare zone ID |
+| `TECH_API_TOKEN` | | Technitium API token |
 | `TECH_BASE_URL` | `http://technitium:5380` | Technitium server URL |
+| `PDNS_API_KEY` | | PowerDNS API key |
 | `PDNS_BASE_URL` | `http://powerdns:8081` | PowerDNS server URL |
+
+### Docker secrets (optional)
+
+For enhanced security, you can switch from env vars to Docker secrets. Uncomment the `secrets` blocks in `docker-compose.yml`, populate the files in `secrets/`, and update `config.json` to use `file:` syntax:
+
+```json
+"apiToken": "file:/run/secrets/cf_api_token"
+```
+
+The `secrets/` directory is gitignored — secret files never enter version control.
 
 ### PUID / PGID
 

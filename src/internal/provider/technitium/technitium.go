@@ -49,7 +49,7 @@ func (p *Provider) ValidateConfig(cfg map[string]any) error {
 
 func (p *Provider) Capabilities() core.ProviderCapabilities {
 	return core.ProviderCapabilities{
-		SupportsComments:                false,
+		SupportsComments:                true,
 		SupportsStructuredTags:          false,
 		SupportsServerSideCommentFilter: false,
 		SupportsServerSideTagFilter:     false,
