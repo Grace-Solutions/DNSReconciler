@@ -1,55 +1,54 @@
 {
-    "version": 1,
-
-    "providerDefaults": {
-        "technitium": {
-            "apiToken":  "env:TECH_API_TOKEN",
-            "baseUrl":   "env:TECH_BASE_URL"
+    "settings": {
+        "runtime": {
+            "reconcileIntervalSeconds": 120,
+            "cleanupOnShutdown":        true,
+            "logLevel":                 "Information",
+            "dryRun":                   false
+        },
+        "network": {
+            "addressSources": [
+                { "priority": 1, "type": "publicIPv4",  "enabled": true },
+                { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
+                { "priority": 3, "type": "rfc1918IPv4", "enabled": true }
+            ]
         }
     },
 
-    "runtime": {
-        "reconcileIntervalSeconds": 120,
-        "cleanupOnShutdown":        true,
-        "logLevel":                 "Information",
-        "dryRun":                   false
-    },
-
-    "network": {
-        "addressSources": [
-            { "priority": 1, "type": "publicIPv4",  "enabled": true },
-            { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
-            { "priority": 3, "type": "rfc1918IPv4",  "enabled": true }
-        ]
-    },
-
-    "defaults": {
-        "enabled":   true,
-        "ownership": "perNode",
-        "ttl":       120,
-        "proxied":   false,
-        "comment":   "Managed by dnsreconciler on ${HOSTNAME}"
-    },
+    "providers": [
+        {
+            "id":           "568111aa-1ac8-46da-8493-1a1648521ac8",
+            "friendlyName": "technitium-local",
+            "type":         "technitium",
+            "enabled":      true,
+            "apiToken":     "env:TECH_API_TOKEN",
+            "baseUrl":      "env:TECH_BASE_URL",
+            "defaults": {
+                "ownership": "perNode",
+                "ttl":       120,
+                "comment":   "Managed by dnsreconciler on ${HOSTNAME}"
+            }
+        }
+    ],
 
     "records": [
         {
-            "id":       "internal-host-v4",
-            "enabled":  true,
-            "provider": "technitium",
-            "zone":     "internal.example.local",
-            "type":     "A",
-            "name":     "${HOSTNAME}.internal.example.local",
-            "content":  "${SELECTED_IPV4}"
+            "id":         "7d7e5d6d-a381-484a-a68c-23b2fdf645e4",
+            "enabled":    true,
+            "providerId": "technitium-local",
+            "zone":       "internal.example.local",
+            "type":       "A",
+            "name":       "${HOSTNAME}.internal.example.local",
+            "content":    "${SELECTED_IPV4}"
         },
         {
-            "id":       "internal-host-v6",
-            "enabled":  false,
-            "provider": "technitium",
-            "zone":     "internal.example.local",
-            "type":     "AAAA",
-            "name":     "${HOSTNAME}.internal.example.local",
-            "content":  "${SELECTED_IPV6}"
+            "id":         "f9f7076a-3210-4f63-9a68-27da8e7f021e",
+            "enabled":    false,
+            "providerId": "technitium-local",
+            "zone":       "internal.example.local",
+            "type":       "AAAA",
+            "name":       "${HOSTNAME}.internal.example.local",
+            "content":    "${SELECTED_IPV6}"
         }
     ]
 }
-

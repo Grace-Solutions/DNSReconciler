@@ -15,10 +15,10 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	recordID := tmpl.ID
 	r.Logger.Debug(fmt.Sprintf("Reconciling record %s", recordID))
 
-	// §21.2 step 1: determine applicable provider
-	provider, ok := r.Providers[tmpl.Provider]
+	// §21.2 step 1: determine applicable provider (looked up by providerId)
+	provider, ok := r.Providers[tmpl.ProviderID]
 	if !ok {
-		err := fmt.Errorf("provider %q not registered", tmpl.Provider)
+		err := fmt.Errorf("provider %q not registered", tmpl.ProviderID)
 		r.Logger.Error(fmt.Sprintf("Record %s: %s", recordID, err))
 		return Result{RecordID: recordID, Action: ActionSkip, Error: err}
 	}
@@ -83,7 +83,7 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	}
 
 	desired := core.Record{
-		Provider:         tmpl.Provider,
+		Provider:         tmpl.ProviderID,
 		Zone:             tmpl.Zone,
 		Type:             tmpl.Type,
 		Name:             name,

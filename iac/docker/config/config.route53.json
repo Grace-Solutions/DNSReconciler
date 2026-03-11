@@ -1,56 +1,55 @@
 {
-    "version": 1,
-
-    "providerDefaults": {
-        "route53": {
-            "accessKeyId":      "env:AWS_ACCESS_KEY_ID",
-            "secretAccessKey":  "env:AWS_SECRET_ACCESS_KEY",
-            "hostedZoneId":     "env:AWS_HOSTED_ZONE_ID",
-            "region":           "us-east-1"
+    "settings": {
+        "runtime": {
+            "reconcileIntervalSeconds": 120,
+            "cleanupOnShutdown":        true,
+            "logLevel":                 "Information",
+            "dryRun":                   false
+        },
+        "network": {
+            "addressSources": [
+                { "priority": 1, "type": "publicIPv4",  "enabled": true },
+                { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
+                { "priority": 3, "type": "rfc1918IPv4", "enabled": true }
+            ]
         }
     },
 
-    "runtime": {
-        "reconcileIntervalSeconds": 120,
-        "cleanupOnShutdown":        true,
-        "logLevel":                 "Information",
-        "dryRun":                   false
-    },
-
-    "network": {
-        "addressSources": [
-            { "priority": 1, "type": "publicIPv4",  "enabled": true },
-            { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
-            { "priority": 3, "type": "rfc1918IPv4",  "enabled": true }
-        ]
-    },
-
-    "defaults": {
-        "enabled":   true,
-        "ownership": "perNode",
-        "ttl":       300,
-        "proxied":   false
-    },
+    "providers": [
+        {
+            "id":              "d8aed64f-7c2a-4929-98d4-946fc7b1c26d",
+            "friendlyName":    "route53-primary",
+            "type":            "route53",
+            "enabled":         true,
+            "accessKeyId":     "env:AWS_ACCESS_KEY_ID",
+            "secretAccessKey": "env:AWS_SECRET_ACCESS_KEY",
+            "hostedZoneId":    "env:AWS_HOSTED_ZONE_ID",
+            "region":          "us-east-1",
+            "defaults": {
+                "ownership": "perNode",
+                "ttl":       300
+            }
+        }
+    ],
 
     "records": [
         {
-            "id":       "aws-host-v4",
-            "enabled":  true,
-            "provider": "route53",
-            "zone":     "example.com",
-            "type":     "A",
-            "name":     "${HOSTNAME}.example.com",
-            "content":  "${SELECTED_IPV4}"
+            "id":         "e670a3b9-2e56-486e-a7f2-31d4069d218e",
+            "enabled":    true,
+            "providerId": "route53-primary",
+            "zone":       "example.com",
+            "type":       "A",
+            "name":       "${HOSTNAME}.example.com",
+            "content":    "${SELECTED_IPV4}"
         },
         {
-            "id":       "aws-host-v6",
-            "enabled":  false,
-            "provider": "route53",
-            "zone":     "example.com",
-            "type":     "AAAA",
-            "name":     "${HOSTNAME}.example.com",
-            "content":  "${SELECTED_IPV6}"
+            "id":         "5f934aa1-8999-4174-81ba-4599d6e706b7",
+            "enabled":    false,
+            "providerId": "route53-primary",
+            "zone":       "example.com",
+            "type":       "AAAA",
+            "name":       "${HOSTNAME}.example.com",
+            "content":    "${SELECTED_IPV6}"
         }
     ]
 }
-

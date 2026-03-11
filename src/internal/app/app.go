@@ -82,23 +82,26 @@ func (a Application) run(command Command) error {
 		return err
 	}
 
+	rt := &cfg.Settings.Runtime
+	net := &cfg.Settings.Network
+
 	// Apply CLI/env interval override before anything reads it
 	if command.OverrideInterval > 0 {
-		a.logger.Information(fmt.Sprintf("Overriding reconcile interval: %ds → %ds", cfg.Runtime.ReconcileIntervalSeconds, command.OverrideInterval))
-		cfg.Runtime.ReconcileIntervalSeconds = command.OverrideInterval
+		a.logger.Information(fmt.Sprintf("Overriding reconcile interval: %ds → %ds", rt.ReconcileIntervalSeconds, command.OverrideInterval))
+		rt.ReconcileIntervalSeconds = command.OverrideInterval
 	}
 
 	// §21.1 step 3: initialize centralized logger
-	a.logger.SetLevel(logging.ParseLevel(cfg.Runtime.LogLevel))
+	a.logger.SetLevel(logging.ParseLevel(rt.LogLevel))
 
 	// §21.1 step 4: load local state
-	storePath := cfg.Runtime.StatePath
+	storePath := rt.StatePath
 	if command.OverrideState != "" {
 		storePath = command.OverrideState
 	}
 	store := state.JSONStore{Path: storePath}
 
-	// Build providers once (§9)
+	// Build providers once (§9) — keyed by provider ID
 	providers := a.buildProviderMap(cfg)
 
 	// reconcileOnce performs a single reconciliation pass (§21.1 steps 5-10).
@@ -126,8 +129,8 @@ func (a Application) run(command Command) error {
 			Providers:       providers,
 			AddressResolver: addrResolver,
 			Snapshot:        snap,
-			GlobalSources:   cfg.Network.AddressSources,
-			DryRun:          cfg.Runtime.DryRun,
+			GlobalSources:   net.AddressSources,
+			DryRun:          rt.DryRun,
 		}
 
 		stats, _ := reconciler.ReconcileAll(ctx, mergedRecords, &st)
@@ -167,11 +170,11 @@ func (a Application) run(command Command) error {
 	defer stop()
 
 	sched := scheduler.New(a.logger, scheduler.Config{
-		IntervalSeconds: cfg.Runtime.ReconcileIntervalSeconds,
+		IntervalSeconds: rt.ReconcileIntervalSeconds,
 		JitterPercent:   10,
 	}, reconcileOnce)
 
-	a.logger.Information(fmt.Sprintf("Starting scheduler (interval=%ds)", cfg.Runtime.ReconcileIntervalSeconds))
+	a.logger.Information(fmt.Sprintf("Starting scheduler (interval=%ds)", rt.ReconcileIntervalSeconds))
 	err = sched.Run(ctx)
 	if err != nil && err != context.Canceled {
 		return err
@@ -179,7 +182,7 @@ func (a Application) run(command Command) error {
 	a.logger.Information("Scheduler stopped gracefully")
 
 	// §26.1: cleanup on graceful shutdown
-	if cfg.Runtime.CleanupOnShutdown {
+	if rt.CleanupOnShutdown {
 		a.logger.Information("CleanupOnShutdown is enabled — deleting owned records")
 		cleaner := cleanup.Cleaner{
 			Logger:    a.logger,
@@ -197,7 +200,8 @@ func (a Application) run(command Command) error {
 	return nil
 }
 
-// buildProviderMap creates provider instances from config using the provider registry (§9).
+// buildProviderMap creates provider instances from the providers array,
+// keyed by provider ID for direct lookup from record templates (§9).
 func (a Application) buildProviderMap(cfg config.Config) map[string]core.Provider {
 	registry := provider.NewRegistry()
 	registry.Register("cloudflare", cloudflare.New)
@@ -206,25 +210,31 @@ func (a Application) buildProviderMap(cfg config.Config) map[string]core.Provide
 	registry.Register("route53", route53.New)
 	registry.Register("azure", azure.New)
 
-	// Collect unique provider names referenced by records
-	needed := map[string]bool{}
-	for _, rec := range cfg.Records {
-		needed[rec.Provider] = true
-	}
-
 	providers := map[string]core.Provider{}
-	for name := range needed {
-		provCfg := cfg.ProviderDefaults[name]
+	for _, entry := range cfg.Providers {
+		if !entry.IsEnabled() {
+			a.logger.Information(fmt.Sprintf("Provider %q is disabled, skipping", entry.ID))
+			continue
+		}
+		provCfg := entry.RawConfig
 		if provCfg == nil {
 			provCfg = map[string]any{}
 		}
-		p, err := registry.Build(name, provCfg, a.logger)
+		p, err := registry.Build(entry.Type, provCfg, a.logger)
 		if err != nil {
-			a.logger.Error(fmt.Sprintf("Failed to initialize provider %q: %s", name, err))
+			a.logger.Error(fmt.Sprintf("Failed to initialize provider %q (%s): %s", entry.ID, entry.Type, err))
 			continue
 		}
-		providers[name] = p
-		a.logger.Information(fmt.Sprintf("Provider %q initialized successfully", name))
+		providers[entry.ID] = p
+		// Also register by friendly name for lookup convenience
+		if entry.FriendlyName != "" {
+			providers[entry.FriendlyName] = p
+		}
+		label := entry.ID
+		if entry.FriendlyName != "" {
+			label = entry.FriendlyName + " (" + entry.ID + ")"
+		}
+		a.logger.Information(fmt.Sprintf("Provider %q [%s] initialized successfully", label, entry.Type))
 	}
 	return providers
 }

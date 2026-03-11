@@ -1,62 +1,61 @@
 {
-    "version": 1,
-
-    "providerDefaults": {
-        "azure": {
-            "tenantId":        "env:AZURE_TENANT_ID",
-            "clientId":        "env:AZURE_CLIENT_ID",
-            "clientSecret":    "env:AZURE_CLIENT_SECRET",
-            "subscriptionId":  "env:AZURE_SUBSCRIPTION_ID",
-            "resourceGroup":   "env:AZURE_RESOURCE_GROUP",
-            "zoneName":        "env:AZURE_ZONE_NAME"
+    "settings": {
+        "runtime": {
+            "reconcileIntervalSeconds": 120,
+            "cleanupOnShutdown":        true,
+            "logLevel":                 "Information",
+            "dryRun":                   false
+        },
+        "network": {
+            "addressSources": [
+                { "priority": 1, "type": "publicIPv4",  "enabled": true },
+                { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
+                { "priority": 3, "type": "rfc1918IPv4", "enabled": true }
+            ]
         }
     },
 
-    "runtime": {
-        "reconcileIntervalSeconds": 120,
-        "cleanupOnShutdown":        true,
-        "logLevel":                 "Information",
-        "dryRun":                   false
-    },
-
-    "network": {
-        "addressSources": [
-            { "priority": 1, "type": "publicIPv4",  "enabled": true },
-            { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
-            { "priority": 3, "type": "rfc1918IPv4",  "enabled": true }
-        ]
-    },
-
-    "defaults": {
-        "enabled":   true,
-        "ownership": "perNode",
-        "ttl":       300,
-        "proxied":   false,
-        "tags": [
-            { "name": "managed-by",  "value": "dnsreconciler" },
-            { "name": "node-id",     "value": "${NODE_ID}" }
-        ]
-    },
+    "providers": [
+        {
+            "id":             "06acd2c5-8bea-4a19-8376-bf8061e16a0a",
+            "friendlyName":   "azure-primary",
+            "type":           "azure",
+            "enabled":        true,
+            "tenantId":       "env:AZURE_TENANT_ID",
+            "clientId":       "env:AZURE_CLIENT_ID",
+            "clientSecret":   "env:AZURE_CLIENT_SECRET",
+            "subscriptionId": "env:AZURE_SUBSCRIPTION_ID",
+            "resourceGroup":  "env:AZURE_RESOURCE_GROUP",
+            "zoneName":       "env:AZURE_ZONE_NAME",
+            "defaults": {
+                "ownership": "perNode",
+                "ttl":       300,
+                "tags": [
+                    { "name": "managed-by", "value": "dnsreconciler" },
+                    { "name": "node-id",    "value": "${NODE_ID}" }
+                ]
+            }
+        }
+    ],
 
     "records": [
         {
-            "id":       "azure-host-v4",
-            "enabled":  true,
-            "provider": "azure",
-            "zone":     "example.com",
-            "type":     "A",
-            "name":     "${HOSTNAME}.example.com",
-            "content":  "${SELECTED_IPV4}"
+            "id":         "15668069-3d4b-4142-977d-c866b0aebf87",
+            "enabled":    true,
+            "providerId": "azure-primary",
+            "zone":       "example.com",
+            "type":       "A",
+            "name":       "${HOSTNAME}.example.com",
+            "content":    "${SELECTED_IPV4}"
         },
         {
-            "id":       "azure-host-v6",
-            "enabled":  false,
-            "provider": "azure",
-            "zone":     "example.com",
-            "type":     "AAAA",
-            "name":     "${HOSTNAME}.example.com",
-            "content":  "${SELECTED_IPV6}"
+            "id":         "acbbe19d-f5e4-44d2-97f5-c50ef28db321",
+            "enabled":    false,
+            "providerId": "azure-primary",
+            "zone":       "example.com",
+            "type":       "AAAA",
+            "name":       "${HOSTNAME}.example.com",
+            "content":    "${SELECTED_IPV6}"
         }
     ]
 }
-

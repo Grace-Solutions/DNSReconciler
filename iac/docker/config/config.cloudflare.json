@@ -1,60 +1,60 @@
 {
-    "version": 1,
-
-    "providerDefaults": {
-        "cloudflare": {
-            "apiToken":  "env:CF_API_TOKEN",
-            "zoneId":    "env:CF_ZONE_ID",
-            "baseUrl":   "https://api.cloudflare.com/client/v4"
+    "settings": {
+        "runtime": {
+            "reconcileIntervalSeconds": 120,
+            "cleanupOnShutdown":        true,
+            "logLevel":                 "Information",
+            "dryRun":                   false
+        },
+        "network": {
+            "addressSources": [
+                { "priority": 1, "type": "publicIPv4",  "enabled": true },
+                { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
+                { "priority": 3, "type": "rfc1918IPv4", "enabled": true }
+            ]
         }
     },
 
-    "runtime": {
-        "reconcileIntervalSeconds": 120,
-        "cleanupOnShutdown":        true,
-        "logLevel":                 "Information",
-        "dryRun":                   false
-    },
-
-    "network": {
-        "addressSources": [
-            { "priority": 1, "type": "publicIPv4",  "enabled": true },
-            { "priority": 2, "type": "cgnatIPv4",   "enabled": true },
-            { "priority": 3, "type": "rfc1918IPv4",  "enabled": true }
-        ]
-    },
-
-    "defaults": {
-        "enabled":   true,
-        "ownership": "perNode",
-        "ttl":       120,
-        "proxied":   false,
-        "comment":   "Managed by dnsreconciler on ${HOSTNAME}",
-        "tags": [
-            { "name": "managed-by",  "value": "dnsreconciler" },
-            { "name": "node-id",     "value": "${NODE_ID}" }
-        ]
-    },
+    "providers": [
+        {
+            "id":           "18212128-4239-40a8-bc79-6a990f254be0",
+            "friendlyName": "cloudflare-primary",
+            "type":         "cloudflare",
+            "enabled":      true,
+            "apiToken":     "env:CF_API_TOKEN",
+            "zoneId":       "env:CF_ZONE_ID",
+            "baseUrl":      "https://api.cloudflare.com/client/v4",
+            "defaults": {
+                "ownership": "perNode",
+                "ttl":       120,
+                "proxied":   false,
+                "comment":   "Managed by dnsreconciler on ${HOSTNAME}",
+                "tags": [
+                    { "name": "managed-by", "value": "dnsreconciler" },
+                    { "name": "node-id",    "value": "${NODE_ID}" }
+                ]
+            }
+        }
+    ],
 
     "records": [
         {
-            "id":       "web-v4",
-            "enabled":  true,
-            "provider": "cloudflare",
-            "zone":     "example.com",
-            "type":     "A",
-            "name":     "${HOSTNAME}.example.com",
-            "content":  "${SELECTED_IPV4}"
+            "id":         "d40a7f8d-f3a0-499e-842e-f066dc6bf874",
+            "enabled":    true,
+            "providerId": "cloudflare-primary",
+            "zone":       "example.com",
+            "type":       "A",
+            "name":       "${HOSTNAME}.example.com",
+            "content":    "${SELECTED_IPV4}"
         },
         {
-            "id":       "web-v6",
-            "enabled":  false,
-            "provider": "cloudflare",
-            "zone":     "example.com",
-            "type":     "AAAA",
-            "name":     "${HOSTNAME}.example.com",
-            "content":  "${SELECTED_IPV6}"
+            "id":         "2da921f6-3e5d-4215-9373-5d685820f2e8",
+            "enabled":    false,
+            "providerId": "cloudflare-primary",
+            "zone":       "example.com",
+            "type":       "AAAA",
+            "name":       "${HOSTNAME}.example.com",
+            "content":    "${SELECTED_IPV6}"
         }
     ]
 }
-

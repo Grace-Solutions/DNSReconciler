@@ -72,7 +72,7 @@ func TestReconcileAll_CreateNewRecord(t *testing.T) {
 	}
 
 	templates := []config.RecordTemplate{{
-		ID: "test-rec", Enabled: boolPtr(true), Provider: "testprov",
+		ID: "test-rec", Enabled: boolPtr(true), ProviderID: "testprov",
 		Zone: "example.com", Type: "A", Name: "a.example.com",
 		Content: "${SELECTED_IPV4}", Ownership: "perNode", TTL: intPtr(120),
 	}}
@@ -102,7 +102,7 @@ func TestReconcileAll_SkipDisabledRecord(t *testing.T) {
 	}
 
 	templates := []config.RecordTemplate{{
-		ID: "disabled-rec", Enabled: boolPtr(false), Provider: "testprov",
+		ID: "disabled-rec", Enabled: boolPtr(false), ProviderID: "testprov",
 		Zone: "example.com", Type: "A", Name: "a.example.com",
 		Content: "${SELECTED_IPV4}",
 	}}
@@ -129,7 +129,7 @@ func TestReconcileAll_SkipMissingProvider(t *testing.T) {
 	}
 
 	templates := []config.RecordTemplate{{
-		ID: "no-prov", Enabled: boolPtr(true), Provider: "missing",
+		ID: "no-prov", Enabled: boolPtr(true), ProviderID: "missing",
 		Zone: "example.com", Type: "A", Name: "a.example.com",
 		Content: "${SELECTED_IPV4}", TTL: intPtr(120),
 	}}
@@ -157,7 +157,7 @@ func TestReconcileAll_DryRunDoesNotCallProvider(t *testing.T) {
 	}
 
 	templates := []config.RecordTemplate{{
-		ID: "dr", Enabled: boolPtr(true), Provider: "testprov",
+		ID: "dr", Enabled: boolPtr(true), ProviderID: "testprov",
 		Zone: "example.com", Type: "A", Name: "a.example.com",
 		Content: "${SELECTED_IPV4}", TTL: intPtr(60),
 	}}

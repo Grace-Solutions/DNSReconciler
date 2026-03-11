@@ -10,38 +10,24 @@ import (
 // DefaultConfig returns a minimal, valid Config with sensible defaults that
 // serves as a starting template when no config file exists.
 func DefaultConfig() Config {
-	enabled := true
-	ttl := 120
-	proxied := false
-
 	return Config{
-		Version:          1,
-		ProviderDefaults: map[string]map[string]any{},
-		Runtime: RuntimeConfig{
-			ReconcileIntervalSeconds: 120,
-			StatePath:                "./state.json",
-			CleanupOnShutdown:        false,
-			LogLevel:                 "Information",
-			DryRun:                   false,
-		},
-		Network: NetworkConfig{
-			AddressSources: []AddressSource{
-				{Priority: 1, Type: "publicIPv4", Enabled: true},
-				{Priority: 2, Type: "rfc1918IPv4", Enabled: true},
+		Settings: SettingsConfig{
+			Runtime: RuntimeConfig{
+				ReconcileIntervalSeconds: 120,
+				StatePath:                "./state.json",
+				CleanupOnShutdown:        false,
+				LogLevel:                 "Information",
+				DryRun:                   false,
+			},
+			Network: NetworkConfig{
+				AddressSources: []AddressSource{
+					{Priority: 1, Type: "publicIPv4", Enabled: true},
+					{Priority: 2, Type: "rfc1918IPv4", Enabled: true},
+				},
 			},
 		},
-		Defaults: RecordDefaults{
-			Enabled:   &enabled,
-			Ownership: "perNode",
-			TTL:       &ttl,
-			Proxied:   &proxied,
-			Comment:   "Managed by dnsreconciler on ${HOSTNAME}",
-			Tags: []Tag{
-				{Name: "managed-by", Value: "dnsreconciler"},
-				{Name: "node-id", Value: "${NODE_ID}"},
-			},
-		},
-		Records: []RecordTemplate{},
+		Providers: []ProviderEntry{},
+		Records:   []RecordTemplate{},
 	}
 }
 
@@ -59,7 +45,7 @@ func WriteDefault(path string) error {
 		}
 	}
 
-	data, err := json.MarshalIndent(DefaultConfig(), "", "  ")
+	data, err := json.MarshalIndent(DefaultConfig(), "", "    ")
 	if err != nil {
 		return fmt.Errorf("marshal default config: %w", err)
 	}

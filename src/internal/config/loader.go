@@ -10,8 +10,7 @@ import (
 )
 
 var (
-	errUnsupportedVersion = errors.New("unsupported config version")
-	errInvalidRecordType  = errors.New("record type must be A or AAAA in v1")
+	errInvalidRecordType = errors.New("record type must be A or AAAA")
 )
 
 // Load reads and validates the config from path. If the file does not exist a
@@ -22,7 +21,6 @@ func Load(path string) (Config, error) {
 		if wErr := WriteDefault(path); wErr != nil {
 			return Config{}, fmt.Errorf("auto-create default config: %w", wErr)
 		}
-		// Signal that we created it — caller can log this.
 	}
 
 	raw, err := os.ReadFile(path)
@@ -40,19 +38,41 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
+// Validate checks the config for structural and semantic correctness.
 func (c Config) Validate() error {
-	if c.Version != 1 {
-		return fmt.Errorf("%w: %d", errUnsupportedVersion, c.Version)
+	if !isAllowed(strings.ToLower(c.Settings.Runtime.LogLevel), "", "trace", "debug", "information", "warning", "error", "critical") {
+		return fmt.Errorf("settings.runtime.logLevel %q is unsupported", c.Settings.Runtime.LogLevel)
 	}
-	if !isAllowed(strings.ToLower(c.Runtime.LogLevel), "", "trace", "debug", "information", "warning", "error", "critical") {
-		return fmt.Errorf("runtime.logLevel %q is unsupported", c.Runtime.LogLevel)
-	}
-	if c.Defaults.Ownership != "" && !isAllowed(c.Defaults.Ownership, "perNode", "singleton", "manual", "disabled") {
-		return fmt.Errorf("defaults.ownership %q is unsupported", c.Defaults.Ownership)
-	}
-	if err := validateSources("network.addressSources", c.Network.AddressSources); err != nil {
+	if err := validateSources("settings.network.addressSources", c.Settings.Network.AddressSources); err != nil {
 		return err
 	}
+
+	// Validate providers
+	seenProvIDs := map[string]struct{}{}
+	seenFriendly := map[string]struct{}{}
+	for _, prov := range c.Providers {
+		if prov.ID == "" {
+			return errors.New("providers[].id is required")
+		}
+		if _, exists := seenProvIDs[prov.ID]; exists {
+			return fmt.Errorf("duplicate provider id %q", prov.ID)
+		}
+		seenProvIDs[prov.ID] = struct{}{}
+		if prov.FriendlyName != "" {
+			if _, exists := seenFriendly[prov.FriendlyName]; exists {
+				return fmt.Errorf("duplicate provider friendlyName %q", prov.FriendlyName)
+			}
+			seenFriendly[prov.FriendlyName] = struct{}{}
+		}
+		if prov.Type == "" {
+			return fmt.Errorf("provider %q must define a type", prov.ID)
+		}
+		if prov.Defaults.Ownership != "" && !isAllowed(prov.Defaults.Ownership, "perNode", "singleton", "manual", "disabled") {
+			return fmt.Errorf("provider %q has unsupported defaults.ownership %q", prov.ID, prov.Defaults.Ownership)
+		}
+	}
+
+	// Validate records
 	seenIDs := map[string]struct{}{}
 	for _, record := range c.Records {
 		if record.ID == "" {
@@ -62,8 +82,12 @@ func (c Config) Validate() error {
 			return fmt.Errorf("duplicate record id %q", record.ID)
 		}
 		seenIDs[record.ID] = struct{}{}
-		if record.Provider == "" || record.Zone == "" || record.Type == "" || record.Name == "" || record.Content == "" {
-			return fmt.Errorf("record %q must define provider, zone, type, name, and content", record.ID)
+		if record.ProviderID == "" || record.Zone == "" || record.Type == "" || record.Name == "" || record.Content == "" {
+			return fmt.Errorf("record %q must define providerId, zone, type, name, and content", record.ID)
+		}
+		// Validate that referenced provider exists
+		if c.FindProvider(record.ProviderID) == nil {
+			return fmt.Errorf("record %q references unknown provider %q", record.ID, record.ProviderID)
 		}
 		if record.Type != "A" && record.Type != "AAAA" {
 			return fmt.Errorf("record %q: %w", record.ID, errInvalidRecordType)
