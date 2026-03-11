@@ -101,6 +101,19 @@ func hasTagCaseInsensitive(tags []core.Tag, name, value string) bool {
 	return false
 }
 
+// maxCommentLength is the maximum number of characters allowed in the
+// comment field. Providers like Cloudflare enforce a 100-character limit.
+const maxCommentLength = 100
+
+// coreOwnershipKeys lists the ownership keys that are always generated
+// by buildOwnershipFilter. Used to distinguish user-supplied keys from
+// system keys during the truncation pass.
+var coreOwnershipKeys = map[string]bool{
+	"managed-by":         true,
+	"node-id":            true,
+	"record-template-id": true,
+}
+
 // buildOwnershipComment creates a JSON-structured comment that embeds
 // ownership metadata alongside an optional user-supplied note or custom
 // key-value pairs.
@@ -116,6 +129,15 @@ func hasTagCaseInsensitive(tags []core.Tag, name, value string) bool {
 //
 //	config:  "comment": "managed by automation"
 //	result:  {"managed-by":"dnsreconciler","node-id":"abc","record-template-id":"xyz","note":"managed by automation"}
+//
+// The final string is capped at maxCommentLength (100) characters. When
+// the full JSON exceeds this limit, fields are removed in priority order:
+//  1. "note" (plain-text fallback)
+//  2. User-supplied keys (anything not in coreOwnershipKeys)
+//  3. "managed-by" (always "dnsreconciler" — least unique)
+//  4. "record-template-id"
+//
+// "node-id" is never removed — it is the most unique identifier.
 func buildOwnershipComment(userComment string, ownership map[string]string) string {
 	obj := make(map[string]string, len(ownership)+4)
 	for k, v := range ownership {
@@ -124,9 +146,54 @@ func buildOwnershipComment(userComment string, ownership map[string]string) stri
 	if userComment != "" {
 		mergeUserComment(obj, userComment)
 	}
+	return marshalAndTruncate(obj)
+}
+
+// marshalAndTruncate serialises obj as JSON. If the result exceeds
+// maxCommentLength, it removes keys one at a time in priority order
+// until the string fits.
+func marshalAndTruncate(obj map[string]string) string {
 	data, err := json.Marshal(obj)
 	if err != nil {
-		return userComment
+		return ""
+	}
+	if len(data) <= maxCommentLength {
+		return string(data)
+	}
+
+	// Removal priority (first removed → least important).
+	// 1. "note"
+	if _, ok := obj["note"]; ok {
+		delete(obj, "note")
+		if s := tryMarshal(obj); len(s) <= maxCommentLength {
+			return s
+		}
+	}
+	// 2. User-supplied keys (non-core, non-note).
+	for k := range obj {
+		if coreOwnershipKeys[k] {
+			continue
+		}
+		delete(obj, k)
+		if s := tryMarshal(obj); len(s) <= maxCommentLength {
+			return s
+		}
+	}
+	// 3. "managed-by"
+	delete(obj, "managed-by")
+	if s := tryMarshal(obj); len(s) <= maxCommentLength {
+		return s
+	}
+	// 4. "record-template-id"
+	delete(obj, "record-template-id")
+	return tryMarshal(obj) // node-id alone should always fit.
+}
+
+// tryMarshal is a convenience wrapper that returns "" on error.
+func tryMarshal(obj map[string]string) string {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return ""
 	}
 	return string(data)
 }

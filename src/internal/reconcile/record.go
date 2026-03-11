@@ -114,6 +114,7 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	// Build a JSON-structured comment embedding ownership metadata.
 	// The user's comment template (if any) is stored under the "note" key.
 	desired.Comment = buildOwnershipComment(comment, filter.Ownership)
+	r.Logger.Information(fmt.Sprintf("Record %s: comment (%d chars) → %s", recordID, len(desired.Comment), desired.Comment))
 	desired.DesiredFingerprint = fingerprint(desired)
 	existing, err := provider.ListRecords(ctx, filter)
 	if err != nil {
