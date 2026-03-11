@@ -131,7 +131,7 @@ func (r *Reconciler) performAction(ctx context.Context, provider core.Provider, 
 	owned, matchMethod := findOwnedRecord(existing, desired, ownership)
 
 	if owned != nil {
-		r.Logger.Information(fmt.Sprintf("Record %s: ownership matched via %s", recordID, matchMethod))
+		r.Logger.Information(fmt.Sprintf("Record %s: ownership matched via %s (existing comment: %q)", recordID, matchMethod, owned.Comment))
 		return r.reconcileExisting(ctx, provider, desired, owned, recordID, st)
 	}
 
@@ -160,13 +160,31 @@ func (r *Reconciler) performAction(ctx context.Context, provider core.Provider, 
 // reconcileExisting handles the case where an existing record was found.
 // If the content matches, it logs and skips. If content differs, it updates.
 func (r *Reconciler) reconcileExisting(ctx context.Context, provider core.Provider, desired core.Record, owned *core.Record, recordID string, st *state.File) Result {
-	// Content-based shortcut: if the record already has the correct content,
-	// log and skip regardless of fingerprint state (handles fresh installs,
-	// lost state, or records adopted via name+type fallback).
+	// Content-based check: if the record already has the correct content,
+	// check whether the comment/metadata also matches. If the comment is
+	// stale (e.g. pre-JSON format), update the record to stamp the new
+	// structured comment so that future passes match via comment-json.
 	if strings.EqualFold(owned.Content, desired.Content) {
-		r.Logger.Information(fmt.Sprintf("Record %s: already exists with correct content, skipping", recordID))
-		updateState(st, recordID, *owned, desired.DesiredFingerprint, desired.Content)
-		return Result{RecordID: recordID, Action: ActionNoop}
+		if owned.Comment == desired.Comment {
+			r.Logger.Information(fmt.Sprintf("Record %s: already exists with correct content and comment, skipping", recordID))
+			updateState(st, recordID, *owned, desired.DesiredFingerprint, desired.Content)
+			return Result{RecordID: recordID, Action: ActionNoop}
+		}
+		// Content matches but comment is stale — update to stamp ownership metadata.
+		r.Logger.Information(fmt.Sprintf("Record %s: content matches but comment differs, updating comment", recordID))
+		r.Logger.Debug(fmt.Sprintf("Record %s: comment have=%q want=%q", recordID, owned.Comment, desired.Comment))
+		desired.ProviderRecordID = owned.ProviderRecordID
+		if r.DryRun {
+			r.Logger.Information(fmt.Sprintf("Record %s: [dry-run] would update comment", recordID))
+			return Result{RecordID: recordID, Action: ActionUpdate}
+		}
+		updated, err := provider.UpdateRecord(ctx, desired)
+		if err != nil {
+			r.Logger.Error(fmt.Sprintf("Record %s: comment update failed: %s", recordID, err))
+			return Result{RecordID: recordID, Action: ActionUpdate, Error: err}
+		}
+		updateState(st, recordID, updated, desired.DesiredFingerprint, desired.Content)
+		return Result{RecordID: recordID, Action: ActionUpdate}
 	}
 
 	// Content differs — update the record.
