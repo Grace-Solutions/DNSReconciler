@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
@@ -38,7 +39,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	logger := logging.New(stderr, logging.LevelInformation)
 	app := Application{
 		logger:         logger,
-		serviceManager: service.NewUnsupportedManager(),
+		serviceManager: service.NewPlatformManager(logger),
 		stdout:         stdout,
 		stderr:         stderr,
 	}
@@ -206,10 +207,15 @@ func (a Application) buildProviderMap(cfg config.Config) map[string]core.Provide
 
 func (a Application) handleService(command Command) error {
 	ctx := context.Background()
+	exePath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve executable path: %w", err)
+	}
 	options := service.Options{
 		Name:        command.ServiceName,
 		DisplayName: "DNS Reconciler",
 		Description: "Dynamic DNS reconciliation service",
+		BinaryPath:  exePath,
 	}
 	switch command.ServiceAction {
 	case service.ActionInstall:
