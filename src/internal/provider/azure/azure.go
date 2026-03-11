@@ -112,12 +112,14 @@ func (p *Provider) doJSON(ctx context.Context, method, path string, body any, de
 
 	url := p.managementURL + path
 	var bodyReader io.Reader
+	var bodySnapshot string
 	if body != nil {
 		encoded, encErr := json.Marshal(body)
 		if encErr != nil {
 			return fmt.Errorf("azure: marshal request: %w", encErr)
 		}
-		bodyReader = strings.NewReader(string(encoded))
+		bodySnapshot = string(encoded)
+		bodyReader = strings.NewReader(bodySnapshot)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
@@ -129,13 +131,17 @@ func (p *Provider) doJSON(ctx context.Context, method, path string, body any, de
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	p.logger.Debug(fmt.Sprintf("HTTP request: %s %s", method, path))
+	if bodySnapshot != "" {
+		p.logger.Debug(fmt.Sprintf("HTTP request: %s %s body=%s", method, url, bodySnapshot))
+	} else {
+		p.logger.Debug(fmt.Sprintf("HTTP request: %s %s", method, url))
+	}
 	start := time.Now()
 
 	resp, err := p.httpClient.Do(req)
 	elapsed := time.Since(start)
 	if err != nil {
-		p.logger.Warning(fmt.Sprintf("HTTP request failed: %s %s (%s): %s", method, path, elapsed, err))
+		p.logger.Warning(fmt.Sprintf("HTTP request failed: %s %s (%s): %s", method, url, elapsed, err))
 		return fmt.Errorf("azure: %s %s: %w", method, url, err)
 	}
 	defer resp.Body.Close()
@@ -146,19 +152,19 @@ func (p *Provider) doJSON(ctx context.Context, method, path string, body any, de
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		p.logger.Warning(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
+		p.logger.Warning(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, url, resp.StatusCode, elapsed))
 		var errResp azureErrorResponse
 		if json.Unmarshal(respBody, &errResp) == nil && errResp.Error.Message != "" {
-			return fmt.Errorf("azure: %s %s: %s — %s", method, path, errResp.Error.Code, errResp.Error.Message)
+			return fmt.Errorf("azure: %s %s: %s — %s", method, url, errResp.Error.Code, errResp.Error.Message)
 		}
 		snippet := string(respBody)
 		if len(snippet) > 200 {
 			snippet = snippet[:200] + "..."
 		}
-		return fmt.Errorf("azure: %s %s returned %d: %s", method, path, resp.StatusCode, snippet)
+		return fmt.Errorf("azure: %s %s returned %d: %s", method, url, resp.StatusCode, snippet)
 	}
 
-	p.logger.Debug(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
+	p.logger.Debug(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, url, resp.StatusCode, elapsed))
 
 	if dest != nil && len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, dest); err != nil {

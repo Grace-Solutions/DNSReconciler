@@ -65,20 +65,21 @@ func (r *Reconciler) ReconcileAll(ctx context.Context, templates []config.Record
 
 		result := r.reconcileOne(ctx, tmpl, st)
 		results = append(results, result)
-		switch result.Action {
-		case ActionCreate:
-			stats.Created++
-		case ActionUpdate:
-			stats.Updated++
-		case ActionDelete:
-			stats.Deleted++
-		case ActionSkip:
-			stats.Skipped++
-		case ActionNoop:
-			// nothing
-		}
 		if result.Error != nil {
 			stats.Errors++
+		} else {
+			switch result.Action {
+			case ActionCreate:
+				stats.Created++
+			case ActionUpdate:
+				stats.Updated++
+			case ActionDelete:
+				stats.Deleted++
+			case ActionSkip:
+				stats.Skipped++
+			case ActionNoop:
+				// nothing
+			}
 		}
 	}
 

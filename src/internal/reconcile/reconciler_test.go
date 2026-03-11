@@ -135,8 +135,8 @@ func TestReconcileAll_SkipMissingProvider(t *testing.T) {
 	}}
 
 	stats, results := r.ReconcileAll(context.Background(), templates, &st)
-	if stats.Skipped != 1 {
-		t.Errorf("expected 1 skipped; got %d", stats.Skipped)
+	if stats.Errors != 1 {
+		t.Errorf("expected 1 error; got %d", stats.Errors)
 	}
 	if results[0].Error == nil {
 		t.Error("expected error for missing provider")

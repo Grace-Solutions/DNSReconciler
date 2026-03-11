@@ -36,11 +36,13 @@ func NewAPIClient(baseURL string, headers map[string]string, logger *logging.Log
 // If dest is nil the body is discarded.
 func (c *APIClient) Do(ctx context.Context, method, path string, body any, dest any) (*http.Response, error) {
 	var bodyReader io.Reader
+	var bodySnapshot string
 	if body != nil {
 		encoded, err := json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("marshal request body: %w", err)
 		}
+		bodySnapshot = string(encoded)
 		bodyReader = bytes.NewReader(encoded)
 	}
 
@@ -57,13 +59,17 @@ func (c *APIClient) Do(ctx context.Context, method, path string, body any, dest 
 		req.Header.Set(k, v)
 	}
 
-	c.Logger.Debug(fmt.Sprintf("HTTP request: %s %s", method, path))
+	if bodySnapshot != "" {
+		c.Logger.Debug(fmt.Sprintf("HTTP request: %s %s body=%s", method, url, bodySnapshot))
+	} else {
+		c.Logger.Debug(fmt.Sprintf("HTTP request: %s %s", method, url))
+	}
 	start := time.Now()
 
 	resp, err := c.HTTPClient.Do(req)
 	elapsed := time.Since(start)
 	if err != nil {
-		c.Logger.Warning(fmt.Sprintf("HTTP request failed: %s %s (%s): %s", method, path, elapsed, err))
+		c.Logger.Warning(fmt.Sprintf("HTTP request failed: %s %s (%s): %s", method, url, elapsed, err))
 		return nil, fmt.Errorf("%s %s: %w", method, url, err)
 	}
 	defer resp.Body.Close()
@@ -74,7 +80,7 @@ func (c *APIClient) Do(ctx context.Context, method, path string, body any, dest 
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		c.Logger.Warning(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
+		c.Logger.Warning(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, url, resp.StatusCode, elapsed))
 		return resp, &APIError{
 			StatusCode: resp.StatusCode,
 			Method:     method,
@@ -83,7 +89,7 @@ func (c *APIClient) Do(ctx context.Context, method, path string, body any, dest 
 		}
 	}
 
-	c.Logger.Debug(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, path, resp.StatusCode, elapsed))
+	c.Logger.Debug(fmt.Sprintf("HTTP response: %s %s → %d (%s)", method, url, resp.StatusCode, elapsed))
 
 	if dest != nil && len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, dest); err != nil {
