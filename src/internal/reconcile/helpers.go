@@ -42,38 +42,52 @@ func buildOwnershipFilter(desired core.Record, nodeID string) core.RecordFilter 
 	}
 }
 
+// Ownership match method constants returned by findOwnedRecord.
+const (
+	MatchNone         = ""
+	MatchTags         = "tags"
+	MatchCommentJSON  = "comment-json"
+	MatchCommentRegex = "comment-regex"
+	MatchNameType     = "name+type"
+)
+
 // findOwnedRecord locates the record we own among the existing set.
 // It matches by name+type and then checks ownership via tags or comment
-// using case-insensitive matching.
+// using case-insensitive matching. It returns the matched record and a
+// string describing which mechanism produced the match.
 //
 // Strategy (in priority order):
 //  1. If the existing record has tags, check whether every ownership
 //     key-value pair appears in the tags (case-insensitive).
-//  2. If tag matching fails (or no tags present), fall back to the
-//     comment field and check whether every ownership value appears
-//     in the comment text (case-insensitive regex).
-//  3. If neither tag nor comment matched, fall back to name+type match.
+//  2. If tag matching fails (or no tags present), try parsing the
+//     comment as JSON and match key-value pairs (comment-json).
+//  3. If JSON parsing fails, fall back to case-insensitive regex
+//     searching for each ownership value (comment-regex).
+//  4. If neither tag nor comment matched, fall back to name+type match.
 //     This ensures that a record already present on the provider (even
 //     without ownership metadata) is treated as a reconciliation
 //     candidate rather than triggering a duplicate-create error.
-func findOwnedRecord(existing []core.Record, desired core.Record, ownership map[string]string) *core.Record {
+func findOwnedRecord(existing []core.Record, desired core.Record, ownership map[string]string) (*core.Record, string) {
 	var nameTypeCandidate *core.Record
 	for i, rec := range existing {
 		if !strings.EqualFold(rec.Name, desired.Name) || !strings.EqualFold(rec.Type, desired.Type) {
 			continue
 		}
 		if matchOwnershipByTags(rec.Tags, ownership) {
-			return &existing[i]
+			return &existing[i], MatchTags
 		}
-		if matchOwnershipByComment(rec.Comment, ownership) {
-			return &existing[i]
+		if method := matchOwnershipByCommentDetailed(rec.Comment, ownership); method != MatchNone {
+			return &existing[i], method
 		}
 		// Track first name+type match as fallback candidate.
 		if nameTypeCandidate == nil {
 			nameTypeCandidate = &existing[i]
 		}
 	}
-	return nameTypeCandidate
+	if nameTypeCandidate != nil {
+		return nameTypeCandidate, MatchNameType
+	}
+	return nil, MatchNone
 }
 
 // matchOwnershipByTags returns true when every key-value pair in the
@@ -217,24 +231,20 @@ func mergeUserComment(obj map[string]string, comment string) {
 	obj["note"] = comment
 }
 
-// matchOwnershipByComment checks whether the comment contains the
-// required ownership key-value pairs.
-//
-// Strategy:
-//  1. Attempt to parse the comment as JSON and match key-value pairs
-//     case-insensitively (structured matching).
-//  2. If JSON parsing fails (legacy or third-party records), fall back
-//     to case-insensitive regex searching for each ownership value.
-func matchOwnershipByComment(comment string, ownership map[string]string) bool {
+// matchOwnershipByCommentDetailed checks whether the comment contains the
+// required ownership key-value pairs and returns the specific mechanism
+// that matched (MatchCommentJSON, MatchCommentRegex, or MatchNone).
+func matchOwnershipByCommentDetailed(comment string, ownership map[string]string) string {
 	if comment == "" || len(ownership) == 0 {
-		return false
+		return MatchNone
 	}
-	// Try structured JSON matching first.
 	if matchOwnershipByCommentJSON(comment, ownership) {
-		return true
+		return MatchCommentJSON
 	}
-	// Fall back to regex-based matching for legacy comments.
-	return matchOwnershipByCommentRegex(comment, ownership)
+	if matchOwnershipByCommentRegex(comment, ownership) {
+		return MatchCommentRegex
+	}
+	return MatchNone
 }
 
 // matchOwnershipByCommentJSON parses the comment as a JSON object and

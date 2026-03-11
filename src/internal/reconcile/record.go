@@ -128,9 +128,10 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 
 // performAction determines and executes the correct action.
 func (r *Reconciler) performAction(ctx context.Context, provider core.Provider, desired core.Record, existing []core.Record, recordID string, st *state.File, ownership map[string]string) Result {
-	owned := findOwnedRecord(existing, desired, ownership)
+	owned, matchMethod := findOwnedRecord(existing, desired, ownership)
 
 	if owned != nil {
+		r.Logger.Information(fmt.Sprintf("Record %s: ownership matched via %s", recordID, matchMethod))
 		return r.reconcileExisting(ctx, provider, desired, owned, recordID, st)
 	}
 
@@ -193,10 +194,13 @@ func (r *Reconciler) handleDuplicateOnCreate(ctx context.Context, provider core.
 		r.Logger.Error(fmt.Sprintf("Record %s: re-query after duplicate failed: %s", recordID, err))
 		return Result{RecordID: recordID, Action: ActionCreate, Error: err}
 	}
-	owned := findOwnedRecord(records, desired, ownership)
-	if owned == nil && len(records) > 0 {
-		// Use first name+type match as candidate.
+	owned, matchMethod := findOwnedRecord(records, desired, ownership)
+	if owned != nil {
+		r.Logger.Information(fmt.Sprintf("Record %s: duplicate re-query matched via %s", recordID, matchMethod))
+	} else if len(records) > 0 {
+		// Use first result as candidate.
 		owned = &records[0]
+		r.Logger.Information(fmt.Sprintf("Record %s: duplicate re-query using first result (no ownership match)", recordID))
 	}
 	if owned == nil {
 		err := fmt.Errorf("record exists at provider but could not be located on re-query")
