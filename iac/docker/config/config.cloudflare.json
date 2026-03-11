@@ -1,0 +1,51 @@
+{
+    "version": 1,
+
+    "providerDefaults": {
+        "cloudflare": {
+            "apiToken":  "env:CF_API_TOKEN",
+            "zoneId":    "env:CF_ZONE_ID",
+            "baseUrl":   "https://api.cloudflare.com/client/v4"
+        }
+    },
+
+    "runtime": {
+        "reconcileIntervalSeconds": 120,
+        "statePath":                "/state/state.json",
+        "cleanupOnShutdown":        true,
+        "logLevel":                 "Information",
+        "dryRun":                   false
+    },
+
+    "network": {
+        "addressSources": [
+            { "priority": 1, "type": "publicIPv4",   "enabled": true },
+            { "priority": 2, "type": "rfc1918IPv4",  "enabled": true }
+        ]
+    },
+
+    "defaults": {
+        "enabled":   true,
+        "ownership": "perNode",
+        "ttl":       120,
+        "proxied":   false,
+        "comment":   "Managed by dnsreconciler on ${HOSTNAME}",
+        "tags": [
+            { "name": "managed-by",  "value": "dnsreconciler" },
+            { "name": "node-id",     "value": "${NODE_ID}" }
+        ]
+    },
+
+    "records": [
+        {
+            "id":       "web",
+            "enabled":  true,
+            "provider": "cloudflare",
+            "zone":     "example.com",
+            "type":     "A",
+            "name":     "${HOSTNAME}.example.com",
+            "content":  "${SELECTED_IPV4}"
+        }
+    ]
+}
+

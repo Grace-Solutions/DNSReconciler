@@ -1,0 +1,45 @@
+{
+    "version": 1,
+
+    "providerDefaults": {
+        "technitium": {
+            "apiToken":  "env:TECH_API_TOKEN",
+            "baseUrl":   "env:TECH_BASE_URL"
+        }
+    },
+
+    "runtime": {
+        "reconcileIntervalSeconds": 120,
+        "statePath":                "/state/state.json",
+        "cleanupOnShutdown":        true,
+        "logLevel":                 "Information",
+        "dryRun":                   false
+    },
+
+    "network": {
+        "addressSources": [
+            { "priority": 1, "type": "rfc1918IPv4",  "enabled": true }
+        ]
+    },
+
+    "defaults": {
+        "enabled":   true,
+        "ownership": "perNode",
+        "ttl":       120,
+        "proxied":   false,
+        "comment":   "Managed by dnsreconciler on ${HOSTNAME}"
+    },
+
+    "records": [
+        {
+            "id":       "internal-host",
+            "enabled":  true,
+            "provider": "technitium",
+            "zone":     "internal.example.local",
+            "type":     "A",
+            "name":     "${HOSTNAME}.internal.example.local",
+            "content":  "${SELECTED_IPV4}"
+        }
+    ]
+}
+

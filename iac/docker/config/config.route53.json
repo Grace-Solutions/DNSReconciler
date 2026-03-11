@@ -1,0 +1,47 @@
+{
+    "version": 1,
+
+    "providerDefaults": {
+        "route53": {
+            "accessKeyId":      "env:AWS_ACCESS_KEY_ID",
+            "secretAccessKey":  "env:AWS_SECRET_ACCESS_KEY",
+            "hostedZoneId":     "env:AWS_HOSTED_ZONE_ID",
+            "region":           "us-east-1"
+        }
+    },
+
+    "runtime": {
+        "reconcileIntervalSeconds": 120,
+        "statePath":                "/state/state.json",
+        "cleanupOnShutdown":        true,
+        "logLevel":                 "Information",
+        "dryRun":                   false
+    },
+
+    "network": {
+        "addressSources": [
+            { "priority": 1, "type": "publicIPv4",   "enabled": true },
+            { "priority": 2, "type": "rfc1918IPv4",  "enabled": true }
+        ]
+    },
+
+    "defaults": {
+        "enabled":   true,
+        "ownership": "perNode",
+        "ttl":       300,
+        "proxied":   false
+    },
+
+    "records": [
+        {
+            "id":       "aws-host",
+            "enabled":  true,
+            "provider": "route53",
+            "zone":     "example.com",
+            "type":     "A",
+            "name":     "${HOSTNAME}.example.com",
+            "content":  "${SELECTED_IPV4}"
+        }
+    ]
+}
+

@@ -1,0 +1,46 @@
+{
+    "version": 1,
+
+    "providerDefaults": {
+        "powerdns": {
+            "apiKey":    "env:PDNS_API_KEY",
+            "baseUrl":   "env:PDNS_BASE_URL",
+            "serverId":  "localhost"
+        }
+    },
+
+    "runtime": {
+        "reconcileIntervalSeconds": 120,
+        "statePath":                "/state/state.json",
+        "cleanupOnShutdown":        true,
+        "logLevel":                 "Information",
+        "dryRun":                   false
+    },
+
+    "network": {
+        "addressSources": [
+            { "priority": 1, "type": "rfc1918IPv4",  "enabled": true }
+        ]
+    },
+
+    "defaults": {
+        "enabled":   true,
+        "ownership": "perNode",
+        "ttl":       120,
+        "proxied":   false,
+        "comment":   "Managed by dnsreconciler on ${HOSTNAME}"
+    },
+
+    "records": [
+        {
+            "id":       "mesh-node",
+            "enabled":  true,
+            "provider": "powerdns",
+            "zone":     "mesh.example.internal",
+            "type":     "A",
+            "name":     "${HOSTNAME}.mesh.example.internal",
+            "content":  "${SELECTED_IPV4}"
+        }
+    ]
+}
+
