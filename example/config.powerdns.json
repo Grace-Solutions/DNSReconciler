@@ -17,7 +17,7 @@
 
     "providers": [
         {
-            "id":           "c0b2e442-2045-448b-bfc1-a6524932d90d",
+            "providerId":   "c0b2e442-2045-448b-bfc1-a6524932d90d",
             "friendlyName": "powerdns-mesh",
             "type":         "powerdns",
             "enabled":      true,
@@ -32,19 +32,19 @@
 
     "records": [
         {
-            "providerId": "powerdns-mesh",
+            "providerId": "c0b2e442-2045-448b-bfc1-a6524932d90d",
             "recordId":   "050ef75c-5acb-48b0-83ed-8f9086ab81cf",
             "enabled":    true,
             "type":       "A",
-            "name":       "${HOSTNAME}.mesh.example.internal",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV4}"
         },
         {
-            "providerId": "powerdns-mesh",
+            "providerId": "c0b2e442-2045-448b-bfc1-a6524932d90d",
             "recordId":   "0471d858-d257-4451-8a88-a1b73d880586",
             "enabled":    false,
             "type":       "AAAA",
-            "name":       "${HOSTNAME}.mesh.example.internal",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV6}"
         }
     ]

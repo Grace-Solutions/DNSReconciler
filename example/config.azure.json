@@ -17,7 +17,7 @@
 
     "providers": [
         {
-            "id":             "06acd2c5-8bea-4a19-8376-bf8061e16a0a",
+            "providerId":     "06acd2c5-8bea-4a19-8376-bf8061e16a0a",
             "friendlyName":   "azure-primary",
             "type":           "azure",
             "enabled":        true,
@@ -38,19 +38,19 @@
 
     "records": [
         {
-            "providerId": "azure-primary",
+            "providerId": "06acd2c5-8bea-4a19-8376-bf8061e16a0a",
             "recordId":   "15668069-3d4b-4142-977d-c866b0aebf87",
             "enabled":    true,
             "type":       "A",
-            "name":       "${HOSTNAME}.example.com",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV4}"
         },
         {
-            "providerId": "azure-primary",
+            "providerId": "06acd2c5-8bea-4a19-8376-bf8061e16a0a",
             "recordId":   "acbbe19d-f5e4-44d2-97f5-c50ef28db321",
             "enabled":    false,
             "type":       "AAAA",
-            "name":       "${HOSTNAME}.example.com",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV6}"
         }
     ]

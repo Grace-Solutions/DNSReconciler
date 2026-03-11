@@ -17,7 +17,7 @@
 
     "providers": [
         {
-            "id":              "d8aed64f-7c2a-4929-98d4-946fc7b1c26d",
+            "providerId":      "d8aed64f-7c2a-4929-98d4-946fc7b1c26d",
             "friendlyName":    "route53-primary",
             "type":            "route53",
             "enabled":         true,
@@ -32,19 +32,19 @@
 
     "records": [
         {
-            "providerId": "route53-primary",
+            "providerId": "d8aed64f-7c2a-4929-98d4-946fc7b1c26d",
             "recordId":   "e670a3b9-2e56-486e-a7f2-31d4069d218e",
             "enabled":    true,
             "type":       "A",
-            "name":       "${HOSTNAME}.example.com",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV4}"
         },
         {
-            "providerId": "route53-primary",
+            "providerId": "d8aed64f-7c2a-4929-98d4-946fc7b1c26d",
             "recordId":   "5f934aa1-8999-4174-81ba-4599d6e706b7",
             "enabled":    false,
             "type":       "AAAA",
-            "name":       "${HOSTNAME}.example.com",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV6}"
         }
     ]

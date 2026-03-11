@@ -65,7 +65,7 @@
             "recordId":   "04399d6f-36fb-4659-9dd4-dd67cfe86a72",
             "enabled":    true,
             "type":       "A",
-            "name":       "api.example.com",
+            "name":       "api.${ZONE}",
             "content":    "${SELECTED_IPV4}",
             "tags": [
                 { "name": "service", "value": "api" }
@@ -76,7 +76,7 @@
             "recordId":   "ef3b8299-a4f6-42e1-ba06-105a7fb1ebf9",
             "enabled":    true,
             "type":       "A",
-            "name":       "api.mesh.example.internal",
+            "name":       "api.${ZONE}",
             "content":    "${SELECTED_IPV4}",
             "addressSelection": {
                 "useGlobalDefaults": false,
@@ -101,7 +101,7 @@
             "recordId":   "a1c7d3e5-9f82-4b16-8e4a-7c3d5f9a2b18",
             "enabled":    true,
             "type":       "A",
-            "name":       "${HOSTNAME}.internal.example.local",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV4}"
         }
     ]

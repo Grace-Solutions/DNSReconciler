@@ -17,7 +17,7 @@
 
     "providers": [
         {
-            "id":           "568111aa-1ac8-46da-8493-1a1648521ac8",
+            "providerId":   "568111aa-1ac8-46da-8493-1a1648521ac8",
             "friendlyName": "technitium-local",
             "type":         "technitium",
             "enabled":      true,
@@ -31,19 +31,19 @@
 
     "records": [
         {
-            "providerId": "technitium-local",
+            "providerId": "568111aa-1ac8-46da-8493-1a1648521ac8",
             "recordId":   "7d7e5d6d-a381-484a-a68c-23b2fdf645e4",
             "enabled":    true,
             "type":       "A",
-            "name":       "${HOSTNAME}.internal.example.local",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV4}"
         },
         {
-            "providerId": "technitium-local",
+            "providerId": "568111aa-1ac8-46da-8493-1a1648521ac8",
             "recordId":   "f9f7076a-3210-4f63-9a68-27da8e7f021e",
             "enabled":    false,
             "type":       "AAAA",
-            "name":       "${HOSTNAME}.internal.example.local",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV6}"
         }
     ]

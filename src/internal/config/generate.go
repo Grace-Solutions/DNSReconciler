@@ -47,7 +47,7 @@ const defaultConfigJSON = `{
             "recordId":   "02275d10-d877-486c-9773-346555c1964a",
             "enabled":    true,
             "type":       "A",
-            "name":       "${HOSTNAME}.example.com",
+            "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV4}"
         }
     ]
