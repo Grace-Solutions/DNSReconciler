@@ -91,9 +91,9 @@ func (p *Provider) detectZonePlan(ctx context.Context) error {
 	p.mu.Unlock()
 
 	if isFree {
-		p.logger.Information(fmt.Sprintf("Cloudflare zone %q is on the free plan — tags disabled, using comment-based ownership", p.zoneName))
+		p.logger.Information(fmt.Sprintf("Cloudflare [Zone: %s] [Plan: free] tags disabled, using comment-based ownership", p.zoneName))
 	} else {
-		p.logger.Information(fmt.Sprintf("Cloudflare zone %q is on the %s plan — tag-based ownership enabled", p.zoneName, resp.Result.Plan.Name))
+		p.logger.Information(fmt.Sprintf("Cloudflare [Zone: %s] [Plan: %s] tag-based ownership enabled", p.zoneName, resp.Result.Plan.Name))
 	}
 	return nil
 }

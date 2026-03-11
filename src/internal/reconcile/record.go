@@ -91,7 +91,7 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	}
 
 	// Log the fully expanded record state for visibility.
-	r.Logger.Information(fmt.Sprintf("Record %s: expanded → Type=%s Name=%s Content=%s Zone=%s TTL=%d Tags=%d",
+	r.Logger.Information(fmt.Sprintf("Record %s: expanded → [Type: %s] [Name: %s] [Content: %s] [Zone: %s] [TTL: %d] [Tags: %d]",
 		recordID, tmpl.Type, name, content, tmpl.Zone, ttl, len(tags)))
 
 	desired := core.Record{
@@ -114,7 +114,7 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	// Build a JSON-structured comment embedding ownership metadata.
 	// The user's comment template (if any) is stored under the "note" key.
 	desired.Comment = buildOwnershipComment(comment, filter.Ownership)
-	r.Logger.Information(fmt.Sprintf("Record %s: comment (%d chars) → %s", recordID, len(desired.Comment), desired.Comment))
+	r.Logger.Information(fmt.Sprintf("Record %s: desired comment [Length: %d] → %s", recordID, len(desired.Comment), desired.Comment))
 	desired.DesiredFingerprint = fingerprint(desired)
 	existing, err := provider.ListRecords(ctx, filter)
 	if err != nil {
@@ -131,7 +131,8 @@ func (r *Reconciler) performAction(ctx context.Context, provider core.Provider, 
 	owned, matchMethod := findOwnedRecord(existing, desired, ownership)
 
 	if owned != nil {
-		r.Logger.Information(fmt.Sprintf("Record %s: ownership matched via %s (existing comment: %q)", recordID, matchMethod, owned.Comment))
+		r.Logger.Information(fmt.Sprintf("Record %s: ownership matched via %s", recordID, matchMethod))
+		r.Logger.Information(fmt.Sprintf("Record %s: existing comment → %s", recordID, owned.Comment))
 		return r.reconcileExisting(ctx, provider, desired, owned, recordID, st)
 	}
 

@@ -307,11 +307,11 @@ func (a Application) buildProviderMap(cfg config.Config) map[string]core.Provide
 			continue
 		}
 		providers[entry.ID] = p
-		label := entry.ID
-		if entry.FriendlyName != "" {
-			label = entry.FriendlyName + " (" + entry.ID + ")"
+		label := entry.FriendlyName
+		if label == "" {
+			label = entry.ID
 		}
-		a.logger.Information(fmt.Sprintf("Provider %q [%s] initialized successfully", label, entry.Type))
+		a.logger.Information(fmt.Sprintf("Provider %s [ProviderID: %s] [Provider: %s] initialized successfully", label, entry.ID, entry.Type))
 	}
 	return providers
 }
