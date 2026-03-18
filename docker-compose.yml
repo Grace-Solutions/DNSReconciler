@@ -2,21 +2,27 @@
 # DNS Reconciler — Production Compose
 #
 # Pulls the pre-built image from Docker Hub.
-# For local builds from source, use docker-compose-build.yml instead.
+# For local builds from source, use iac/docker/docker-compose-build.yml.
 #
 # Usage:
 #   docker compose up -d
 #
-# Environment:
-#   Copy .env.example to .env and fill in your credentials.
-#   All variables are loaded via env_file — no need to
-#   duplicate them in an environment: block.
+# First Run:
+#   If no config.json exists in the dnsreconciler_config volume,
+#   the application auto-generates a safe default with all
+#   providers and records disabled. Edit it with real values
+#   and restart the container.
 #
 # Volumes:
-#   ./config  — place your config.json here
-#   ./state   — persisted reconciliation state
+#   dnsreconciler_config — persistent config (config.json)
+#   dnsreconciler_state  — persistent reconciliation state
 #   Docker socket is mounted read-only for container
 #   discovery (IPVLAN/MACVLAN). Remove if not needed.
+#
+# Environment:
+#   Copy iac/docker/.env.example to .env in this directory
+#   and fill in your credentials. All variables are loaded
+#   via env_file.
 #
 # Secrets (optional):
 #   To use file-based secrets instead of env vars,
@@ -32,13 +38,17 @@ services:
     env_file:
       - .env
     volumes:
-      - ./config:/config
-      - ./state:/state
+      - dnsreconciler_config:/config
+      - dnsreconciler_state:/state
       - /var/run/docker.sock:/var/run/docker.sock:ro
     deploy:
       resources:
         limits:
           memory: 64M
+
+volumes:
+  dnsreconciler_config:
+  dnsreconciler_state:
 
 #secrets:
 #  cf_api_token:
@@ -49,3 +59,4 @@ services:
 #    file: ./secrets/tech_api_token
 #  pdns_api_key:
 #    file: ./secrets/pdns_api_key
+

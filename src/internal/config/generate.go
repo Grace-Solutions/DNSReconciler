@@ -6,16 +6,16 @@ import (
 	"path/filepath"
 )
 
-// defaultConfigJSON is a human-friendly starter config written when no config
-// file exists. It includes a sample Cloudflare provider and record so new
-// users can see the shape and edit it with real values.
+// defaultConfigJSON is a safe starter config written when no config file
+// exists. All providers and records are disabled so the application starts
+// without errors and idles until the user configures it with real values.
 const defaultConfigJSON = `{
     "settings": {
         "runtime": {
             "schedule":          "0 0 */4 * * *",
             "jitter":            "auto",
             "timezone":          "UTC",
-            "statePath":         "./state.json",
+            "statePath":         "/state/state.json",
             "cleanupOnShutdown": false,
             "logLevel":          "Information",
             "dryRun":            false
@@ -30,10 +30,10 @@ const defaultConfigJSON = `{
 
     "providers": [
         {
-            "providerId":   "535c8629-764e-456b-9946-0bce7ea1e739",
-            "friendlyName": "cloudflare-primary",
+            "providerId":   "00000000-0000-0000-0000-000000000000",
+            "friendlyName": "example-cloudflare",
             "type":         "cloudflare",
-            "enabled":      true,
+            "enabled":      false,
             "apiToken":     "env:CF_API_TOKEN",
             "zoneId":       "env:CF_ZONE_ID",
             "zone":         "example.com",
@@ -45,9 +45,9 @@ const defaultConfigJSON = `{
 
     "records": [
         {
-            "providerId": "535c8629-764e-456b-9946-0bce7ea1e739",
-            "recordId":   "02275d10-d877-486c-9773-346555c1964a",
-            "enabled":    true,
+            "providerId": "00000000-0000-0000-0000-000000000000",
+            "recordId":   "00000000-0000-0000-0000-000000000001",
+            "enabled":    false,
             "type":       "A",
             "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV4}"
