@@ -27,7 +27,7 @@ echo ""
 mkdir -p "${ARTIFACTS_DIR}"
 
 # ---- Generate Windows resource (.syso) with embedded icon ----
-echo "[1/6] Generating Windows resource (icon + version info)..."
+echo "[1/7] Generating Windows resource (icon + version info)..."
 GOVERSIONINFO="$(go env GOPATH)/bin/goversioninfo"
 if [ ! -x "${GOVERSIONINFO}" ]; then
     echo "  Installing goversioninfo..."
@@ -70,8 +70,10 @@ TARGETS=(
     "darwin:amd64"
     "darwin:arm64"
     "windows:amd64"
+    "windows:arm64"
 )
 
+TOTAL=$((${#TARGETS[@]} + 1))
 STEP=2
 for target in "${TARGETS[@]}"; do
     IFS=':' read -r GOOS GOARCH <<< "${target}"
@@ -79,7 +81,14 @@ for target in "${TARGETS[@]}"; do
     [ "${GOOS}" = "windows" ] && SUFFIX=".exe"
     OUT="${ARTIFACTS_DIR}/dnsreconciler-${GOOS}-${GOARCH}${SUFFIX}"
 
-    echo "[${STEP}/6] Building ${GOOS}/${GOARCH}..."
+    # Regenerate .syso for the correct architecture when switching Windows targets
+    if [ "${GOOS}" = "windows" ]; then
+        ARCH_FLAG="-64"
+        [ "${GOARCH}" = "arm64" ] && ARCH_FLAG="-arm"
+        (cd "${CMD_DIR}" && "${GOVERSIONINFO}" ${ARCH_FLAG} -icon="${ICON_PATH}" -o resource_windows.syso 2>/dev/null)
+    fi
+
+    echo "[${STEP}/${TOTAL}] Building ${GOOS}/${GOARCH}..."
     (cd "${SRC_DIR}" && CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" \
         go build -ldflags="${LDFLAGS}" -o "${OUT}" ./cmd/dnsreconciler)
     echo "  ✓ ${OUT##*/}"

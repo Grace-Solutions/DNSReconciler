@@ -4,13 +4,13 @@
             "Major": 2026,
             "Minor": 3,
             "Patch": 18,
-            "Build": 1733
+            "Build": 1740
         },
         "ProductVersion": {
             "Major": 2026,
             "Minor": 3,
             "Patch": 18,
-            "Build": 1733
+            "Build": 1740
         },
         "FileFlagsMask": "3f",
         "FileFlags": "",
@@ -22,12 +22,12 @@
         "Comments": "DNS Reconciliation Engine",
         "CompanyName": "Grace Solutions",
         "FileDescription": "DNSReconciler - DNS Reconciliation Engine",
-        "FileVersion": "2026.03.18.1733",
+        "FileVersion": "2026.03.18.1740",
         "InternalName": "dnsreconciler",
         "LegalCopyright": "Grace Solutions",
         "OriginalFilename": "dnsreconciler.exe",
         "ProductName": "DNSReconciler",
-        "ProductVersion": "2026.03.18.1733"
+        "ProductVersion": "2026.03.18.1740"
     },
     "VarFileInfo": {
         "Translation": {
