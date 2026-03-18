@@ -6,9 +6,29 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/gracesolutions/dns-automatic-updater/internal/service"
 )
+
+// resolveSecret resolves a value that may use the file: prefix to read
+// from a Docker secret (or any file). This mirrors the provider-level
+// ResolveCredential pattern but works on raw string values from env vars.
+//
+//	"file:/run/secrets/my_token" → reads file contents
+//	anything else                → returned as-is
+func resolveSecret(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, "file:") {
+		filePath := strings.TrimPrefix(value, "file:")
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return "", fmt.Errorf("read secret file %q: %w", filePath, err)
+		}
+		return strings.TrimSpace(string(content)), nil
+	}
+	return value, nil
+}
 
 type CommandKind string
 
@@ -100,16 +120,37 @@ func parseRun(args []string) (Command, error) {
 			cfgURL = envVal
 		}
 	}
+	if cfgURL != "" {
+		if resolved, err := resolveSecret(cfgURL); err != nil {
+			return Command{}, fmt.Errorf("CONFIG_URL: %w", err)
+		} else {
+			cfgURL = resolved
+		}
+	}
 	cfgHeader := *configHeader
 	if cfgHeader == "" {
 		if envVal := os.Getenv("CONFIG_HEADER"); envVal != "" {
 			cfgHeader = envVal
 		}
 	}
+	if cfgHeader != "" {
+		if resolved, err := resolveSecret(cfgHeader); err != nil {
+			return Command{}, fmt.Errorf("CONFIG_HEADER: %w", err)
+		} else {
+			cfgHeader = resolved
+		}
+	}
 	cfgToken := *configToken
 	if cfgToken == "" {
 		if envVal := os.Getenv("CONFIG_TOKEN"); envVal != "" {
 			cfgToken = envVal
+		}
+	}
+	if cfgToken != "" {
+		if resolved, err := resolveSecret(cfgToken); err != nil {
+			return Command{}, fmt.Errorf("CONFIG_TOKEN: %w", err)
+		} else {
+			cfgToken = resolved
 		}
 	}
 	cfgMethod := *configMethod

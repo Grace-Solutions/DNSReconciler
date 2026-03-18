@@ -35,6 +35,22 @@ fi
 
 echo "Running as uid=${PUID}(${USERNAME}) gid=${PGID}(${GROUPNAME})"
 
+# ---- Docker socket access ----
+# If the Docker socket is mounted, detect its GID and add the user to
+# that group so container discovery works without running as root.
+DOCKER_SOCK="/var/run/docker.sock"
+if [ -S "${DOCKER_SOCK}" ]; then
+    SOCK_GID="$(stat -c '%g' "${DOCKER_SOCK}")"
+    # Create a group with the socket's GID (if it doesn't already exist)
+    DOCKER_GROUP="dockersock"
+    if ! getent group "${SOCK_GID}" >/dev/null 2>&1; then
+        addgroup -g "${SOCK_GID}" -S "${DOCKER_GROUP}"
+    else
+        DOCKER_GROUP="$(getent group "${SOCK_GID}" | cut -d: -f1)"
+    fi
+    addgroup "${USERNAME}" "${DOCKER_GROUP}" 2>/dev/null || true
+fi
+
 # ---- Fix ownership on mount points ----
 chown -R "${PUID}:${PGID}" /config /state
 

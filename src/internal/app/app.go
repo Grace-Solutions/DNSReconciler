@@ -147,8 +147,17 @@ func (a Application) run(command Command) error {
 	// §21.1 step 3: initialize centralized logger
 	a.logger.SetLevel(logging.ParseLevel(cfg.Settings.Runtime.LogLevel))
 
-	// Set up rotating log file. Default directory is the binary's directory.
-	logDir := binaryDir()
+	// Set up rotating log file.
+	// Priority: LOG_PATH env var → state file's directory → binary's directory.
+	logDir := os.Getenv("LOG_PATH")
+	if logDir == "" {
+		if storePath := cfg.Settings.Runtime.StatePath; storePath != "" {
+			logDir = filepath.Dir(storePath)
+		}
+	}
+	if logDir == "" {
+		logDir = binaryDir()
+	}
 	exeName := filepath.Base(executablePath())
 	logFileWriter, err := logging.NewRotatingFileWriter(logDir, exeName)
 	if err != nil {
