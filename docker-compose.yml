@@ -64,10 +64,16 @@ services:
       - dnsreconciler_config:/config
       - dnsreconciler_state:/state
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - DNSReconciler-EXTERNAL
     deploy:
       resources:
         limits:
           memory: 64M
+
+networks:
+  DNSReconciler-EXTERNAL:
+    external: true
 
 volumes:
   dnsreconciler_config:

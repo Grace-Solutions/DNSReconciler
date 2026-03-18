@@ -12,9 +12,12 @@ RUN go mod download
 # Version injected at build time (yyyy.mm.dd.hhmm)
 ARG APP_VERSION=dev
 
+# Target platform injected by docker buildx
+ARG TARGETARCH
+
 # Copy source and build a fully static binary
 COPY src/ ./
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w -X github.com/gracesolutions/dns-automatic-updater/internal/app.Version=${APP_VERSION}" \
     -o /dnsreconciler ./cmd/dnsreconciler
 
