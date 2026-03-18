@@ -106,7 +106,5 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - DNSRECONCILER-CONFIG-00001:/config
       - DNSRECONCILER-STATE-00001:/state
-    environment:
-      DNS_PUBLIC_HOSTNAME: '${DNS_PUBLIC_HOSTNAME:-dnsreconciler.mydomain.local}'
-    labels:
-      dns.public.hostname: ${DNS_PUBLIC_HOSTNAME}
+    #labels:
+      #dns.public.hostname: ${DNS_PUBLIC_HOSTNAME}
