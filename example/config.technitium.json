@@ -52,7 +52,7 @@
 
     "containerRecords": [
         {
-            "description": "Creates A records for containers on IPVLAN networks using the dns.hostname label",
+            "description": "Creates DNS records for containers configured with MACVLAN or IPVLAN networking",
             "providerId":  "568111aa-1ac8-46da-8493-1a1648521ac8",
             "enabled":     true,
             "type":        "A",

@@ -110,7 +110,7 @@
 
     "containerRecords": [
         {
-            "description": "MACVLAN example: creates A records for containers with dns.hostname label on Cloudflare",
+            "description": "Creates DNS records for containers configured with MACVLAN or IPVLAN networking",
             "providerId":  "f86e9515-aea4-475b-bda4-343bb8edc41f",
             "enabled":     true,
             "type":        "A",
@@ -123,18 +123,6 @@
             "tags": [
                 { "name": "service", "value": "${LABEL:dns.hostname}" }
             ]
-        },
-        {
-            "description": "IPVLAN example: creates A records for containers with dns.hostname label on Technitium",
-            "providerId":  "b5e82b02-32ba-48f7-b575-3a01940e7056",
-            "enabled":     true,
-            "type":        "A",
-            "name":        "${LABEL:dns.hostname}.${ZONE}",
-            "content":     "${CONTAINER_IP}",
-            "comment":     "{'containerName':'${CONTAINER_NAME}','hostname':'${HOSTNAME}','nodeId':'${NODE_ID}'}",
-            "include":     [".*"],
-            "exclude":     ["^$"],
-            "matchFields": ["auto"]
         }
     ]
 }
