@@ -10,9 +10,10 @@ import (
 // The schema uses a providers array (instance-based) instead of a type-keyed map,
 // allowing multiple instances of the same provider type (e.g. two Cloudflare accounts).
 type Config struct {
-	Settings  SettingsConfig   `json:"settings"`
-	Providers []ProviderEntry  `json:"providers"`
-	Records   []RecordTemplate `json:"records"`
+	Settings         SettingsConfig            `json:"settings"`
+	Providers        []ProviderEntry           `json:"providers"`
+	Records          []RecordTemplate          `json:"records"`
+	ContainerRecords []ContainerRecordTemplate `json:"containerRecords,omitempty"`
 }
 
 // SettingsConfig wraps runtime and network configuration under a single key.
@@ -97,6 +98,21 @@ type RecordTemplate struct {
 	MatchLabels      map[string]string `json:"matchLabels,omitempty"`
 	AddressSelection *AddressSelection `json:"addressSelection,omitempty"`
 	IPFamily         string            `json:"ipFamily,omitempty"`
+
+	// ContainerMeta is set only for records generated from containerRecords
+	// templates. It carries the discovered container's metadata for variable
+	// expansion. Not serialized to JSON — populated at runtime.
+	ContainerMeta *ContainerMeta `json:"-"`
+}
+
+// ContainerMeta holds container-specific metadata attached to a generated
+// RecordTemplate so the reconciler can build the container-aware expansion context.
+type ContainerMeta struct {
+	ContainerName  string
+	ContainerID    string // short ID (12 chars)
+	ContainerIP    string // IP on the routable network
+	ContainerImage string
+	Labels         map[string]string
 }
 
 type AddressSelection struct {
@@ -118,6 +134,36 @@ type AddressSource struct {
 type Tag struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+// ContainerRecordTemplate defines a DNS record template that is expanded once
+// per discovered container on a routable network (IPVLAN or MACVLAN). The
+// template fields support the same variable expansion as RecordTemplate plus
+// container-specific variables: CONTAINER_NAME, CONTAINER_ID, CONTAINER_IP,
+// CONTAINER_IMAGE, and label lookups via LABEL:<key>.
+//
+// Ownership tags (nodeId, containerName, containerId) are auto-injected at
+// expansion time so providers with structured tag support can match ownership
+// without being constrained by comment length limits.
+type ContainerRecordTemplate struct {
+	ProviderID  string            `json:"providerId"`
+	TemplateID  string            `json:"templateId"`
+	Enabled     *bool             `json:"enabled,omitempty"`
+	Type        string            `json:"type"`
+	Name        string            `json:"name"`
+	Content     string            `json:"content"`
+	Zone        string            `json:"zone,omitempty"`
+	TTL         *int              `json:"ttl,omitempty"`
+	Proxied     *bool             `json:"proxied,omitempty"`
+	Comment     string            `json:"comment,omitempty"`
+	Tags        []Tag             `json:"tags,omitempty"`
+	Ownership   string            `json:"ownership,omitempty"`
+	LabelFilter map[string]string `json:"labelFilter,omitempty"`
+}
+
+// IsEnabled returns whether this container record template is active.
+func (c *ContainerRecordTemplate) IsEnabled() bool {
+	return c.Enabled == nil || *c.Enabled
 }
 
 // FindProvider looks up a provider entry by its UUID (providerId).

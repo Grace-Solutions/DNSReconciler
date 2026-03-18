@@ -3,7 +3,7 @@ package address
 import (
 	"bytes"
 	"context"
-	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/gracesolutions/dns-automatic-updater/internal/config"
@@ -85,25 +85,25 @@ func TestResolve_DisabledSourceSkipped(t *testing.T) {
 }
 
 func TestMatchesCIDRConstraints_AllowList(t *testing.T) {
-	ip := net.ParseIP("100.64.0.5")
-	if !matchesCIDRConstraints(ip, []string{"100.64.0.0/10"}, nil) {
+	addr := netip.MustParseAddr("100.64.0.5")
+	if !matchesCIDRConstraints(addr, []string{"100.64.0.0/10"}, nil) {
 		t.Error("expected IP to match allow range")
 	}
-	if matchesCIDRConstraints(ip, []string{"10.0.0.0/8"}, nil) {
+	if matchesCIDRConstraints(addr, []string{"10.0.0.0/8"}, nil) {
 		t.Error("expected IP to be excluded when not in allow range")
 	}
 }
 
 func TestMatchesCIDRConstraints_DenyList(t *testing.T) {
-	ip := net.ParseIP("10.0.0.5")
-	if matchesCIDRConstraints(ip, nil, []string{"10.0.0.0/8"}) {
+	addr := netip.MustParseAddr("10.0.0.5")
+	if matchesCIDRConstraints(addr, nil, []string{"10.0.0.0/8"}) {
 		t.Error("expected IP to be denied")
 	}
 }
 
 func TestMatchesFamily(t *testing.T) {
-	v4 := net.ParseIP("192.168.1.1")
-	v6 := net.ParseIP("2001:db8::1")
+	v4 := netip.MustParseAddr("192.168.1.1")
+	v6 := netip.MustParseAddr("2001:db8::1")
 	if !matchesFamily(v4, "ipv4") {
 		t.Error("IPv4 should match ipv4 family")
 	}

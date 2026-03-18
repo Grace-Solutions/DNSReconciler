@@ -99,7 +99,12 @@ func findOwnedRecord(existing []core.Record, desired core.Record, ownership map[
 			nameTypeCandidate = &existing[i]
 		}
 	}
-	if nameTypeCandidate != nil {
+	// Only fall back to name+type when there are NO ownership keys.
+	// When ownership keys are present (e.g. nodeId), each node must match
+	// exclusively via its own metadata. This enables DNS round-robin: multiple
+	// nodes can register A records for the same FQDN without clobbering each
+	// other's entries.
+	if nameTypeCandidate != nil && len(ownership) == 0 {
 		return nameTypeCandidate, MatchNameType
 	}
 	return nil, MatchNone

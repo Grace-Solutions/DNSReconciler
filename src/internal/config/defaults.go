@@ -63,3 +63,40 @@ func MergeAllDefaults(cfg *Config) []RecordTemplate {
 	return result
 }
 
+// MergeContainerDefaults applies the same inheritance chain to a
+// ContainerRecordTemplate, filling in provider-level and built-in defaults.
+func MergeContainerDefaults(ct ContainerRecordTemplate, prov *ProviderEntry) ContainerRecordTemplate {
+	merged := ct
+	if prov != nil {
+		if merged.Zone == "" {
+			merged.Zone = prov.Zone
+		}
+		if merged.TTL == nil {
+			merged.TTL = prov.TTL
+		}
+		if merged.Proxied == nil {
+			merged.Proxied = prov.Proxied
+		}
+		if merged.Comment == "" {
+			merged.Comment = prov.Comment
+		}
+		if len(merged.Tags) == 0 && len(prov.Tags) > 0 {
+			merged.Tags = make([]Tag, len(prov.Tags))
+			copy(merged.Tags, prov.Tags)
+		}
+	}
+	if merged.Enabled == nil {
+		merged.Enabled = boolp(true)
+	}
+	if merged.Ownership == "" {
+		merged.Ownership = "perNode"
+	}
+	if merged.TTL == nil {
+		merged.TTL = intp(120)
+	}
+	if merged.Proxied == nil {
+		merged.Proxied = boolp(false)
+	}
+	return merged
+}
+

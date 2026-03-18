@@ -3,7 +3,7 @@ package address
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"sort"
 
 	"github.com/gracesolutions/dns-automatic-updater/internal/config"
@@ -44,16 +44,16 @@ func (r *DefaultResolver) Resolve(
 			r.Logger.Trace(fmt.Sprintf("Address source %s (priority %d) yielded no result", src.Type, src.Priority))
 			continue
 		}
-		ip := net.ParseIP(addr)
-		if ip == nil {
+		parsed, err := netip.ParseAddr(addr)
+		if err != nil {
 			r.Logger.Trace(fmt.Sprintf("Address source %s returned unparseable address %q", src.Type, addr))
 			continue
 		}
-		if !matchesFamily(ip, ipFamily) {
+		if !matchesFamily(parsed, ipFamily) {
 			r.Logger.Trace(fmt.Sprintf("Address %s from %s does not match family %s", addr, src.Type, ipFamily))
 			continue
 		}
-		if !matchesCIDRConstraints(ip, src.AllowRanges, src.DenyRanges) {
+		if !matchesCIDRConstraints(parsed, src.AllowRanges, src.DenyRanges) {
 			r.Logger.Trace(fmt.Sprintf("Address %s from %s excluded by CIDR constraints", addr, src.Type))
 			continue
 		}
@@ -90,14 +90,13 @@ func (r *DefaultResolver) resolveSource(snap runtimectx.Snapshot, src config.Add
 // matching the requested IP version. If interfaceName is empty, searches all interfaces.
 func findInterfaceAddress(ifaces map[string][]string, name string, wantIPv6 bool) string {
 	check := func(addrs []string) string {
-		for _, addr := range addrs {
-			ip := net.ParseIP(addr)
-			if ip == nil {
+		for _, a := range addrs {
+			addr, err := netip.ParseAddr(a)
+			if err != nil {
 				continue
 			}
-			isV6 := ip.To4() == nil
-			if isV6 == wantIPv6 {
-				return addr
+			if addr.Is6() == wantIPv6 {
+				return a
 			}
 		}
 		return ""
@@ -116,42 +115,42 @@ func findInterfaceAddress(ifaces map[string][]string, name string, wantIPv6 bool
 	return ""
 }
 
-// matchesFamily checks if the IP matches the requested family filter.
-func matchesFamily(ip net.IP, family string) bool {
+// matchesFamily checks if addr matches the requested family filter.
+func matchesFamily(addr netip.Addr, family string) bool {
 	switch family {
 	case "ipv4", "IPv4":
-		return ip.To4() != nil
+		return addr.Is4() || addr.Is4In6()
 	case "ipv6", "IPv6":
-		return ip.To4() == nil
+		return addr.Is6() && !addr.Is4In6()
 	default:
 		return true // "dual" or empty = accept either
 	}
 }
 
 // matchesCIDRConstraints enforces allow/deny CIDR rules (§12.3).
-func matchesCIDRConstraints(ip net.IP, allow, deny []string) bool {
+func matchesCIDRConstraints(addr netip.Addr, allow, deny []string) bool {
 	if len(deny) > 0 {
 		for _, cidr := range deny {
-			_, network, err := net.ParseCIDR(cidr)
+			prefix, err := netip.ParsePrefix(cidr)
 			if err != nil {
 				continue
 			}
-			if network.Contains(ip) {
+			if prefix.Contains(addr) {
 				return false
 			}
 		}
 	}
 	if len(allow) > 0 {
 		for _, cidr := range allow {
-			_, network, err := net.ParseCIDR(cidr)
+			prefix, err := netip.ParsePrefix(cidr)
 			if err != nil {
 				continue
 			}
-			if network.Contains(ip) {
+			if prefix.Contains(addr) {
 				return true
 			}
 		}
-		return false // allow list is non-empty but IP didn't match any
+		return false // allow list is non-empty but addr didn't match any
 	}
 	return true
 }

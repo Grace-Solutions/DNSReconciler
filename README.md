@@ -13,6 +13,7 @@ A single-binary, cross-platform DNS reconciliation agent. Each node detects its 
 - [CLI reference](#cli-reference)
 - [Configuration](#configuration)
 - [Variable expansion](#variable-expansion)
+- [Container service discovery](#container-service-discovery)
 - [Address selection](#address-selection)
 - [Docker deployment](#docker-deployment)
 - [Host service lifecycle](#host-service-lifecycle)
@@ -58,6 +59,7 @@ This makes it ideal for:
 | **Auto-generated config** | If the config file doesn't exist on first run, a working default is written automatically. |
 | **Service lifecycle** | Idempotent `install`, `uninstall`, `start`, `stop`, and `init` (install + start) via `sc.exe` (Windows), `systemctl` (Linux), `launchctl` (macOS). |
 | **Centralized logging** | All HTTP requests, provider operations, plan detection, and config reloads are logged with timing and status information. |
+| **Container service discovery** | Automatic DNS registration for containers on L2-routable networks (IPVLAN/MACVLAN). Queries Docker and Podman Unix sockets directly — no CLI dependency. Label-based hostname expansion via `${LABEL:key}`. |
 | **Docker-native** | Multi-stage Alpine build with `PUID`/`PGID` support and auto-permission entrypoint. |
 | **Credential flexibility** | Direct values, `env:VAR_NAME`, or `file:/path/to/secret`. Secrets are never logged. |
 | **Dry-run mode** | Log every planned change without touching the provider API. |
@@ -272,6 +274,7 @@ That's it. Everything else has sensible defaults.
 | `settings` | `object` | No | Runtime and network configuration |
 | `providers` | `array` | Yes | Provider instances with credentials and zone-level defaults |
 | `records` | `array` | Yes | Record templates to reconcile |
+| `containerRecords` | `array` | No | Container-aware record templates (see [Container service discovery](#container-service-discovery)) |
 
 #### `providers[]`
 
@@ -387,6 +390,20 @@ Variables use `${VAR_NAME}` syntax and are expanded in `name`, `content`, `comme
 | `${ZONE}` | Record's zone | `example.com` |
 | `${RECORD_ID}` | Record's template ID | `public-api` |
 
+### Container variables
+
+The following variables are available **only** inside `containerRecords[]` templates. They are populated per-container during discovery.
+
+| Variable | Source | Example value |
+|----------|--------|---------------|
+| `${CONTAINER_NAME}` | Container name | `web-frontend` |
+| `${CONTAINER_ID}` | Short 12-char container ID | `a1b2c3d4e5f6` |
+| `${CONTAINER_IP}` | IP on the routable network | `172.16.16.200` |
+| `${CONTAINER_IMAGE}` | Container image name | `nginx:alpine` |
+| `${LABEL:key}` | Value of container label `key` | `${LABEL:dns.hostname}` → `webserver` |
+
+All standard variables (`${HOSTNAME}`, `${NODE_ID}`, `${ZONE}`, etc.) are also available in container record templates.
+
 **Example:**
 
 ```json
@@ -396,6 +413,75 @@ Variables use `${VAR_NAME}` syntax and are expanded in `name`, `content`, `comme
   "comment": "Managed by dnsreconciler on ${HOSTNAME} (${OS}/${ARCH})"
 }
 ```
+
+---
+
+## Container service discovery
+
+Containers running on L2-routable networks (IPVLAN or MACVLAN) can be automatically discovered and registered in DNS. The reconciler queries Docker and Podman Unix sockets directly — no CLI binaries are required on the host.
+
+### How it works
+
+1. **Socket detection** — the reconciler probes `/var/run/docker.sock` and `/run/podman/podman.sock` for available container runtimes.
+2. **Network filtering** — only networks with `ipvlan` or `macvlan` drivers are considered. Bridge, overlay, and host networks are ignored because their addresses are not directly routable on the LAN.
+3. **Container enumeration** — running containers attached to a qualifying network are discovered via the Engine REST API.
+4. **Template expansion** — each `containerRecords[]` template is expanded once per discovered container, substituting container-specific variables.
+5. **Deterministic IDs** — a stable record ID is generated from `SHA-256(templateId + containerId)`, ensuring consistent ownership tracking across restarts.
+6. **Ownership injection** — three tags (`nodeId`, `containerName`, `containerId`) are auto-injected into every generated record. Providers with structured tag support (Cloudflare, Azure) use these for ownership matching. Providers without tag support (Technitium, PowerDNS) fall back to comment-based ownership; the auto-injected tags are stripped before the API call.
+
+### `containerRecords[]` schema
+
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `providerId` | `string` | Yes | References a provider by `id` or `friendlyName` |
+| `templateId` | `string` | Yes | Unique identifier for this template (used in deterministic ID generation) |
+| `enabled` | `bool` | No | Default `true` |
+| `type` | `string` | Yes | `A` or `AAAA` |
+| `name` | `string` | Yes | FQDN template (supports variable expansion including `${LABEL:key}`) |
+| `content` | `string` | Yes | Record value — typically `${CONTAINER_IP}` |
+| `zone` | `string` | No | DNS zone (inherited from provider if not set) |
+| `ttl` | `int` | No | Override provider TTL |
+| `proxied` | `bool` | No | Override provider proxied flag |
+| `comment` | `string` | No | Ownership comment (supports variable expansion) |
+| `tags` | `array` | No | Additional tags (supports variable expansion) |
+| `ownership` | `string` | No | `perNode` (default), `singleton`, `manual`, `disabled` |
+| `labelFilter` | `object` | No | Key/value pairs — only containers whose labels match all entries are included |
+
+### Container label convention
+
+Containers opt-in to DNS registration by setting labels. The recommended convention is:
+
+```bash
+docker run -d --name web \
+  --network lan-macvlan \
+  --label dns.hostname=webserver \
+  nginx:alpine
+```
+
+Then reference it in the template:
+
+```json
+{
+  "templateId": "macvlan-service-record",
+  "type": "A",
+  "name": "${LABEL:dns.hostname}.${ZONE}",
+  "content": "${CONTAINER_IP}",
+  "comment": "{'containerName':'${CONTAINER_NAME}','hostname':'${HOSTNAME}','nodeId':'${NODE_ID}'}"
+}
+```
+
+This creates an A record `webserver.example.com → 172.16.16.200` with ownership metadata in the comment.
+
+### Docker socket access
+
+When running the reconciler in Docker, mount the host socket read-only:
+
+```yaml
+volumes:
+  - /var/run/docker.sock:/var/run/docker.sock:ro
+```
+
+See the [`docker-compose.yml`](iac/docker/docker-compose.yml) for the full example with the mount commented out by default.
 
 ---
 
@@ -684,6 +770,7 @@ docker compose build
 │       ├── app/                   # Application wiring, CLI parsing, config hot-reload
 │       ├── cleanup/               # Graceful shutdown record cleanup
 │       ├── config/                # Config loading, validation, defaults, auto-generation
+│       ├── containerrt/           # Container runtime discovery (Docker/Podman via Unix socket)
 │       ├── core/                  # Domain types, Provider interface, CapabilityRefresher
 │       ├── expansion/             # ${VAR} expansion engine
 │       ├── logging/               # Centralized structured logger

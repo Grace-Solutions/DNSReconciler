@@ -149,6 +149,16 @@ func (a Application) run(command Command) error {
 		// §21.1 step 7: merge defaults
 		mergedRecords := config.MergeAllDefaults(&currentCfg)
 
+		// Phase 2: expand containerRecords templates against discovered containers
+		if len(currentCfg.ContainerRecords) > 0 && snap.ContainerDetector != nil {
+			containerTemplates := reconcile.ExpandContainerRecords(ctx, a.logger, snap.ContainerDetector, &currentCfg)
+			if len(containerTemplates) > 0 {
+				a.logger.Information(fmt.Sprintf("Container discovery: generated %d record(s) from %d template(s)",
+					len(containerTemplates), len(currentCfg.ContainerRecords)))
+				mergedRecords = append(mergedRecords, containerTemplates...)
+			}
+		}
+
 		// §21.1 steps 6, 8-9: resolve addresses, expand, reconcile
 		addrResolver := address.NewDefaultResolver(a.logger)
 

@@ -7,8 +7,10 @@ import (
 	"strings"
 )
 
-// varPattern matches ${VAR_NAME} placeholders.
-var varPattern = regexp.MustCompile(`\$\{([A-Z0-9_]+)\}`)
+// varPattern matches ${VAR_NAME} placeholders. The character class allows
+// uppercase variables (HOSTNAME, NODE_ID), container label lookups with
+// the LABEL: prefix (e.g. ${LABEL:dns.hostname}), and dot-separated keys.
+var varPattern = regexp.MustCompile(`\$\{([A-Za-z0-9_:./-]+)\}`)
 
 // Context holds all available variable values for expansion.
 // Keys must match the spec's §19.1 names (without ${}).

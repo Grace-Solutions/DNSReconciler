@@ -1,7 +1,7 @@
 package runtimectx
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 )
 
@@ -22,11 +22,11 @@ func TestIsRFC1918(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.ip, func(t *testing.T) {
-			ip := net.ParseIP(tt.ip)
-			if ip == nil {
+			addr, err := netip.ParseAddr(tt.ip)
+			if err != nil {
 				t.Fatalf("invalid test IP: %s", tt.ip)
 			}
-			got := isRFC1918(ip)
+			got := isRFC1918(addr)
 			if got != tt.want {
 				t.Errorf("isRFC1918(%s) = %v; want %v", tt.ip, got, tt.want)
 			}
@@ -47,11 +47,11 @@ func TestIsCGNAT(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.ip, func(t *testing.T) {
-			ip := net.ParseIP(tt.ip)
-			if ip == nil {
+			addr, err := netip.ParseAddr(tt.ip)
+			if err != nil {
 				t.Fatalf("invalid test IP: %s", tt.ip)
 			}
-			got := isCGNAT(ip)
+			got := isCGNAT(addr)
 			if got != tt.want {
 				t.Errorf("isCGNAT(%s) = %v; want %v", tt.ip, got, tt.want)
 			}
@@ -64,12 +64,15 @@ func TestFindFirstMatchingAddress(t *testing.T) {
 		"eth0": {"203.0.113.5", "192.168.1.10"},
 		"eth1": {"10.0.0.5"},
 	}
-	got := findFirstMatchingAddress(ifaces, isRFC1918)
+	got := findFirstMatchingAddress(ifaces, isRFC1918, nil)
 	if got == "" {
 		t.Fatal("expected to find an RFC1918 address")
 	}
-	ip := net.ParseIP(got)
-	if !isRFC1918(ip) {
+	addr, err := netip.ParseAddr(got)
+	if err != nil {
+		t.Fatalf("unparseable result: %s", got)
+	}
+	if !isRFC1918(addr) {
 		t.Errorf("findFirstMatchingAddress returned %s which is not RFC1918", got)
 	}
 }
@@ -78,9 +81,27 @@ func TestFindFirstMatchingAddress_NoMatch(t *testing.T) {
 	ifaces := map[string][]string{
 		"eth0": {"203.0.113.5"},
 	}
-	got := findFirstMatchingAddress(ifaces, isRFC1918)
+	got := findFirstMatchingAddress(ifaces, isRFC1918, nil)
 	if got != "" {
 		t.Errorf("expected empty string; got %s", got)
+	}
+}
+
+func TestFindFirstMatchingAddress_ExcludesCIDRs(t *testing.T) {
+	ifaces := map[string][]string{
+		"docker0": {"172.17.0.1"},
+		"eth0":    {"172.16.16.39"},
+	}
+	excluded := []netip.Prefix{netip.MustParsePrefix("172.17.0.0/16")}
+	got := findFirstMatchingAddress(ifaces, isRFC1918, excluded)
+	if got == "172.17.0.1" {
+		t.Error("should have excluded Docker bridge address 172.17.0.1")
+	}
+	if got == "" {
+		t.Fatal("expected to find 172.16.16.39 after excluding Docker bridge")
+	}
+	if got != "172.16.16.39" {
+		t.Errorf("expected 172.16.16.39; got %s", got)
 	}
 }
 

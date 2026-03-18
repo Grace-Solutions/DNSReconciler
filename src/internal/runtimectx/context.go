@@ -1,6 +1,10 @@
 package runtimectx
 
-import "context"
+import (
+	"context"
+
+	"github.com/gracesolutions/dns-automatic-updater/internal/containerrt"
+)
 
 type Snapshot struct {
 	Hostname           string
@@ -13,6 +17,11 @@ type Snapshot struct {
 	CGNATIPv4          string
 	Environment        map[string]string
 	InterfaceAddresses map[string][]string
+
+	// ContainerDetector is populated during Resolve and carries the
+	// detected Docker/Podman runtime so the reconciliation pipeline can
+	// reuse it for container discovery without re-probing sockets.
+	ContainerDetector *containerrt.Detector
 }
 
 type Resolver interface {

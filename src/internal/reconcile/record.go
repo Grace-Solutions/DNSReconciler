@@ -47,7 +47,22 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 		Zone:         tmpl.Zone,
 		RecordID:     tmpl.RecordID,
 	}
-	expCtx := expansion.BuildContext(r.Snapshot, rv)
+
+	// Use container-aware context when this record was generated from a
+	// containerRecords template, otherwise standard context.
+	var expCtx expansion.Context
+	if tmpl.ContainerMeta != nil {
+		cv := expansion.ContainerVars{
+			ContainerName:  tmpl.ContainerMeta.ContainerName,
+			ContainerID:    tmpl.ContainerMeta.ContainerID,
+			ContainerIP:    tmpl.ContainerMeta.ContainerIP,
+			ContainerImage: tmpl.ContainerMeta.ContainerImage,
+			Labels:         tmpl.ContainerMeta.Labels,
+		}
+		expCtx = expansion.BuildContainerContext(r.Snapshot, rv, cv)
+	} else {
+		expCtx = expansion.BuildContext(r.Snapshot, rv)
+	}
 
 	name, err := expansion.MustExpand(tmpl.Name, expCtx)
 	if err != nil {

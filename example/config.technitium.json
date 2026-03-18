@@ -46,5 +46,18 @@
             "name":       "${HOSTNAME}.${ZONE}",
             "content":    "${SELECTED_IPV6}"
         }
+    ],
+
+    "containerRecords": [
+        {
+            "_comment":    "Creates A records for containers on IPVLAN networks using the dns.hostname label",
+            "providerId":  "568111aa-1ac8-46da-8493-1a1648521ac8",
+            "templateId":  "ipvlan-service-record",
+            "enabled":     true,
+            "type":        "A",
+            "name":        "${LABEL:dns.hostname}.${ZONE}",
+            "content":     "${CONTAINER_IP}",
+            "comment":     "{'containerName':'${CONTAINER_NAME}','hostname':'${HOSTNAME}','nodeId':'${NODE_ID}'}"
+        }
     ]
 }

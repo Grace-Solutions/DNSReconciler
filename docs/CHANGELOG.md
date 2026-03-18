@@ -1,6 +1,32 @@
 # Changelog
 
-## Unreleased
+## 2026.03.18.1515
+
+### Added
+
+- **Container service discovery** — automatic DNS registration for containers on L2-routable networks (IPVLAN and MACVLAN). Queries Docker and Podman Unix sockets directly via the Engine REST API — no CLI dependency required.
+- **`containerRecords[]` config section** — template-based record definitions that expand once per discovered container. Supports all standard variables plus container-specific ones.
+- **Container variables** — `${CONTAINER_NAME}`, `${CONTAINER_ID}`, `${CONTAINER_IP}`, `${CONTAINER_IMAGE}`, and label lookups via `${LABEL:key}` syntax.
+- **Auto-injected ownership tags** — every container-generated record receives `nodeId`, `containerName`, and `containerId` tags automatically. Providers without structured tag support (Technitium, PowerDNS) have these stripped before the API call.
+- **Deterministic record IDs** — container records use `SHA-256(templateId + containerId)` for stable ownership tracking across restarts.
+- **`labelFilter` support** — container record templates can filter containers by label key/value pairs.
+- **Docker socket mount** — `docker-compose.yml` updated with optional read-only Docker socket mount for container discovery.
+
+### Changed
+
+- **Address selection** — virtual bridge interfaces (`docker0`, `br-*`, `veth*`, `virbr*`, `cni*`, `flannel*`, `calico*`, `weave*`) are now excluded from RFC 1918 and CGNAT address detection to prevent container bridge IPs from being selected as the host address.
+- **Example configs** — all provider example configs now include `containerRecords` examples alternating between IPVLAN and MACVLAN use cases.
+- **README** — added Container Service Discovery section, `containerRecords[]` schema, container variable reference, and updated project structure.
+
+### Infrastructure
+
+- **`containerrt` package** — new package for container runtime discovery with `DockerClient` and `PodmanClient` implementations using Unix socket HTTP transport.
+- **`reconcile/container.go`** — template expansion logic that generates concrete `RecordTemplate` instances from `ContainerRecordTemplate` × discovered containers.
+- **`.gitignore`** — added `state.json` exclusion.
+
+---
+
+## Unreleased (initial)
 
 ### Added
 

@@ -1,7 +1,7 @@
 package runtimectx
 
 import (
-	"net"
+	"net/netip"
 	"os"
 	"runtime"
 	"strings"
@@ -40,54 +40,65 @@ func readMachineID() string {
 	return ""
 }
 
-// RFC1918 private address ranges.
-var rfc1918Ranges = []string{
-	"10.0.0.0/8",
-	"172.16.0.0/12",
-	"192.168.0.0/16",
+// RFC1918 private address prefixes (parsed once at init).
+var rfc1918Prefixes []netip.Prefix
+
+// CGNAT address prefix (parsed once at init).
+var cgnatPrefix netip.Prefix
+
+func init() {
+	for _, cidr := range []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"} {
+		rfc1918Prefixes = append(rfc1918Prefixes, netip.MustParsePrefix(cidr))
+	}
+	cgnatPrefix = netip.MustParsePrefix("100.64.0.0/10")
 }
 
-// CGNAT address range (100.64.0.0/10).
-var cgnatRange = "100.64.0.0/10"
-
-// isRFC1918 returns true if the address falls in an RFC1918 range.
-func isRFC1918(ip net.IP) bool {
-	for _, cidr := range rfc1918Ranges {
-		_, network, err := net.ParseCIDR(cidr)
-		if err != nil {
-			continue
-		}
-		if network.Contains(ip) {
+// isRFC1918 returns true if addr falls in an RFC 1918 range.
+func isRFC1918(addr netip.Addr) bool {
+	for _, p := range rfc1918Prefixes {
+		if p.Contains(addr) {
 			return true
 		}
 	}
 	return false
 }
 
-// isCGNAT returns true if the address falls in the CGNAT range (100.64.0.0/10).
-func isCGNAT(ip net.IP) bool {
-	_, network, _ := net.ParseCIDR(cgnatRange)
-	return network != nil && network.Contains(ip)
+// isCGNAT returns true if addr falls in the CGNAT range (100.64.0.0/10).
+func isCGNAT(addr netip.Addr) bool {
+	return cgnatPrefix.Contains(addr)
 }
 
 // findFirstMatchingAddress scans all interface addresses and returns the first
-// IPv4 address matching the predicate.
-func findFirstMatchingAddress(ifaces map[string][]string, predicate func(net.IP) bool) string {
+// IPv4 address matching the predicate, skipping any addresses in excludedCIDRs.
+func findFirstMatchingAddress(ifaces map[string][]string, predicate func(netip.Addr) bool, excludedCIDRs []netip.Prefix) string {
 	for _, addrs := range ifaces {
-		for _, addr := range addrs {
-			ip := net.ParseIP(addr)
-			if ip == nil {
+		for _, a := range addrs {
+			addr, err := netip.ParseAddr(a)
+			if err != nil {
 				continue
 			}
 			// Only consider IPv4 for RFC1918/CGNAT.
-			if ip.To4() == nil {
+			if !addr.Is4() {
 				continue
 			}
-			if predicate(ip) {
-				return ip.String()
+			if isExcludedByPrefix(addr, excludedCIDRs) {
+				continue
+			}
+			if predicate(addr) {
+				return addr.String()
 			}
 		}
 	}
 	return ""
+}
+
+// isExcludedByPrefix returns true if addr falls within any of the given prefixes.
+func isExcludedByPrefix(addr netip.Addr, prefixes []netip.Prefix) bool {
+	for _, p := range prefixes {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+	return false
 }
 

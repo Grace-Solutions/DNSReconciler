@@ -6,11 +6,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/gracesolutions/dns-automatic-updater/internal/containerrt"
 	"github.com/gracesolutions/dns-automatic-updater/internal/logging"
 )
 
@@ -58,13 +60,33 @@ func (r *DefaultResolver) Resolve(ctx context.Context) (Snapshot, error) {
 
 	snap.NodeID = r.resolveNodeID(snap.Hostname)
 	snap.InterfaceAddresses = r.collectInterfaceAddresses()
+
+	// Auto-detect container runtime networks and exclude their CIDRs from
+	// RFC1918/CGNAT address selection so we never pick a Docker/Podman
+	// bridge address (e.g. 172.17.0.1) over a real host address.
+	detector := containerrt.NewDetector(r.Logger)
+	var excludedPrefixes []netip.Prefix
+	if detector.HasRuntime() {
+		for _, cidr := range detector.ExcludedCIDRs(ctx) {
+			if p, err := netip.ParsePrefix(cidr); err == nil {
+				excludedPrefixes = append(excludedPrefixes, p)
+			}
+		}
+		if len(excludedPrefixes) > 0 {
+			r.Logger.Debug(fmt.Sprintf("Container runtime: excluding %d CIDR(s) from address selection", len(excludedPrefixes)))
+		}
+	}
+	// Store the detector on the snapshot so the reconciliation pipeline
+	// can use it for container discovery without re-probing sockets.
+	snap.ContainerDetector = detector
+
 	snap.PublicIPv4 = r.fetchPublicIP(ctx, r.PublicIPv4URLs, "IPv4")
 	snap.PublicIPv6 = r.fetchPublicIP(ctx, r.PublicIPv6URLs, "IPv6")
-	snap.RFC1918IPv4 = findFirstMatchingAddress(snap.InterfaceAddresses, isRFC1918)
-	snap.CGNATIPv4 = findFirstMatchingAddress(snap.InterfaceAddresses, isCGNAT)
+	snap.RFC1918IPv4 = findFirstMatchingAddress(snap.InterfaceAddresses, isRFC1918, excludedPrefixes)
+	snap.CGNATIPv4 = findFirstMatchingAddress(snap.InterfaceAddresses, isCGNAT, excludedPrefixes)
 
-	r.Logger.Debug(fmt.Sprintf("Runtime context resolved: hostname=%s nodeID=%s os=%s arch=%s publicIPv4=%s publicIPv6=%s",
-		snap.Hostname, snap.NodeID, snap.OS, snap.Architecture, snap.PublicIPv4, snap.PublicIPv6))
+	r.Logger.Debug(fmt.Sprintf("Runtime context resolved: hostname=%s nodeID=%s os=%s arch=%s publicIPv4=%s publicIPv6=%s rfc1918=%s cgnat=%s",
+		snap.Hostname, snap.NodeID, snap.OS, snap.Architecture, snap.PublicIPv4, snap.PublicIPv6, snap.RFC1918IPv4, snap.CGNATIPv4))
 
 	return snap, nil
 }

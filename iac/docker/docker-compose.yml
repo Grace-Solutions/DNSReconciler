@@ -29,6 +29,11 @@ services:
     volumes:
       - ./config:/config
       - ./state:/state
+      # --- Optional: Container service discovery ---
+      # Mount the Docker socket (read-only) to enable automatic DNS
+      # registration for containers on IPVLAN/MACVLAN networks.
+      # Remove if you don't use containerRecords in your config.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     # --- Optional: Docker secrets ---
     # Uncomment below to use file-based secrets instead of env vars.
     # Place each credential in its own file under secrets/ and

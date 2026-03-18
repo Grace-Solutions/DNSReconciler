@@ -37,6 +37,9 @@ Artifacts/*
 Releases/*
 !Releases/.gitkeep
 
+# State file
+state.json
+
 # Editor/IDE
 # .idea/
 # .vscode/
