@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -292,6 +293,25 @@ func (a Application) run(command Command) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Start health check HTTP server
+	healthSrv := &http.Server{Addr: ":8000"}
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"healthy","version":"%s"}`, Version)
+	})
+	go func() {
+		a.logger.Information("Health check endpoint listening on :8000/health")
+		if err := healthSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			a.logger.Warning(fmt.Sprintf("Health check server error: %s", err))
+		}
+	}()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		healthSrv.Shutdown(shutdownCtx)
+	}()
+
 	// Start config file watcher
 	fw := watcher.New(command.ConfigPath, a.logger)
 	if err := fw.Init(); err != nil {
@@ -317,8 +337,14 @@ func (a Application) run(command Command) error {
 		return fmt.Errorf("scheduler init failed: %w", err)
 	}
 
-	a.logger.Information(fmt.Sprintf("Starting scheduler (schedule=%q, jitter=%s, tz=%s)",
-		cfg.Settings.Runtime.Schedule, cfg.Settings.Runtime.Jitter, loc))
+	humanSchedule := scheduler.HumanReadableSchedule(cfg.Settings.Runtime.Schedule)
+	if humanSchedule != "" {
+		a.logger.Information(fmt.Sprintf("Starting scheduler (schedule=%q [%s], jitter=%s, tz=%s)",
+			cfg.Settings.Runtime.Schedule, humanSchedule, cfg.Settings.Runtime.Jitter, loc))
+	} else {
+		a.logger.Information(fmt.Sprintf("Starting scheduler (schedule=%q, jitter=%s, tz=%s)",
+			cfg.Settings.Runtime.Schedule, cfg.Settings.Runtime.Jitter, loc))
+	}
 	err = sched.Run(ctx)
 	if err != nil && err != context.Canceled {
 		return err

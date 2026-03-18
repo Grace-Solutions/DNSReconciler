@@ -102,8 +102,11 @@ func (s *Scheduler) nextDelay() time.Duration {
 	totalDelay := baseDelay + jitter
 
 	nextRun := now.Add(totalDelay)
-	s.logger.Information(fmt.Sprintf("Scheduler: next reconciliation at %s (%s)",
-		nextRun.Format("Monday, 15:04:05"),
+	tzName := s.config.Location.String()
+	s.logger.Information(fmt.Sprintf("Scheduler: next reconciliation at %s @ %s [%s] - (%s) from now",
+		nextRun.Format("Monday"),
+		nextRun.Format("15:04:05"),
+		tzName,
 		formatDuration(totalDelay)))
 
 	return totalDelay
@@ -185,5 +188,35 @@ func formatDuration(d time.Duration) string {
 	minutes := (total % 3600) / 60
 	seconds := total % 60
 	return fmt.Sprintf("%d days, %d hours, %d minutes, %d seconds", days, hours, minutes, seconds)
+}
+
+// HumanReadableSchedule converts a 6-field cron expression into a
+// human-readable English description. Returns an empty string if the
+// expression cannot be meaningfully described.
+func HumanReadableSchedule(expr string) string {
+	fields := strings.Fields(expr)
+	if len(fields) != 6 {
+		return ""
+	}
+	sec, min, hour, dom, mon, dow := fields[0], fields[1], fields[2], fields[3], fields[4], fields[5]
+
+	// Only describe common patterns to keep it simple and accurate.
+	allStar := func(s string) bool { return s == "*" }
+
+	// Every N hours at :00 — "0 0 */N * * *"
+	if sec == "0" && min == "0" && strings.HasPrefix(hour, "*/") && allStar(dom) && allStar(mon) && allStar(dow) {
+		interval := strings.TrimPrefix(hour, "*/")
+		return fmt.Sprintf("Every %s hours", interval)
+	}
+	// Every N minutes — "0 */N * * * *"
+	if sec == "0" && strings.HasPrefix(min, "*/") && allStar(hour) && allStar(dom) && allStar(mon) && allStar(dow) {
+		interval := strings.TrimPrefix(min, "*/")
+		return fmt.Sprintf("Every %s minutes", interval)
+	}
+	// Every day at HH:MM — "0 M H * * *"
+	if sec == "0" && !strings.Contains(min, "*") && !strings.Contains(hour, "*") && allStar(dom) && allStar(mon) && allStar(dow) {
+		return fmt.Sprintf("Daily at %s:%s", hour, fmt.Sprintf("%02s", min))
+	}
+	return ""
 }
 

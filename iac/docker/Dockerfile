@@ -40,6 +40,9 @@ COPY --from=build /dnsreconciler /usr/local/bin/dnsreconciler
 COPY iac/docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Health check endpoint
+EXPOSE 8000
+
 # Entrypoint runs as root to fix permissions, then drops to PUID:PGID
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["dnsreconciler", "-config", "/config/config.json"]

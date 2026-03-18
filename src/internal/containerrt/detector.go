@@ -105,14 +105,14 @@ type RoutableContainer struct {
 // matchFields controls which container metadata fields the include/exclude
 // regex patterns are evaluated against. Supported values:
 //
-//	"auto"          — expands to containername + hostname (default)
-//	"containername" — container name
-//	"hostname"      — container hostname (from inspect)
-//	"image"         — container image
-//	"containerid"   — full container ID
+//	"auto"                 — expands to ${CONTAINER_NAME} + ${CONTAINER_HOSTNAME} + ${CONTAINER_IMAGE} (default)
+//	"${CONTAINER_NAME}"     — container name
+//	"${CONTAINER_HOSTNAME}" — container hostname (from inspect)
+//	"${CONTAINER_IMAGE}"    — container image (name:tag)
+//	"${CONTAINER_ID}"       — full container ID
 //
 // If matchFields is empty or contains only "auto", it defaults to
-// ["containername", "hostname"]. Exclude takes precedence over include.
+// ["${CONTAINER_NAME}", "${CONTAINER_HOSTNAME}", "${CONTAINER_IMAGE}"]. Exclude takes precedence over include.
 func (d *Detector) RoutableContainers(ctx context.Context, include, exclude, matchFields []string) []RoutableContainer {
 	// Compile regex patterns once.
 	includeRx := compilePatterns(include, d.logger)
@@ -145,8 +145,8 @@ func (d *Detector) RoutableContainers(ctx context.Context, include, exclude, mat
 				RoutableIP:      net.IPAddress,
 				RoutableNetwork: netName,
 			}
-			d.logger.Debug(fmt.Sprintf("Container runtime: routable container %q on %s (%s) → %s",
-				c.Name, netName, driver, net.IPAddress))
+			d.logger.Information(fmt.Sprintf("Container runtime: routable container %q (image=%s) on %s (%s) → %s",
+				c.Name, c.Image, netName, driver, net.IPAddress))
 			result = append(result, rc)
 		}
 	}
@@ -154,39 +154,71 @@ func (d *Detector) RoutableContainers(ctx context.Context, include, exclude, mat
 }
 
 // resolveMatchFields expands "auto" and normalises field names. If the input
-// is empty, it defaults to ["containername", "hostname"].
+// is empty, it defaults to the auto set. Values can be specified in ${VAR}
+// syntax (e.g. "${CONTAINER_NAME}") to match the expansion variable names
+// used elsewhere in the config. The ${} wrapper is stripped internally.
 func resolveMatchFields(raw []string) []string {
+	defaults := []string{"CONTAINER_NAME", "CONTAINER_HOSTNAME", "CONTAINER_IMAGE"}
 	if len(raw) == 0 {
-		return []string{"containername", "hostname"}
+		return defaults
 	}
 	var fields []string
 	for _, f := range raw {
-		f = strings.ToLower(strings.TrimSpace(f))
-		if f == "auto" {
-			fields = append(fields, "containername", "hostname")
+		f = strings.TrimSpace(f)
+		// Strip ${...} wrapper if present for consistency with expansion syntax.
+		f = stripVarSyntax(f)
+		upper := strings.ToUpper(f)
+		if upper == "AUTO" {
+			fields = append(fields, defaults...)
 		} else {
-			fields = append(fields, f)
+			fields = append(fields, normaliseFieldName(upper))
 		}
 	}
 	if len(fields) == 0 {
-		return []string{"containername", "hostname"}
+		return defaults
 	}
 	return fields
 }
 
+// stripVarSyntax removes ${...} wrapping from a field name so users can write
+// matchFields as ["${CONTAINER_NAME}"] to match the expansion variable syntax.
+func stripVarSyntax(s string) string {
+	if strings.HasPrefix(s, "${") && strings.HasSuffix(s, "}") {
+		return s[2 : len(s)-1]
+	}
+	return s
+}
+
+// normaliseFieldName maps legacy lowercase names to the canonical variable-style
+// names for backward compatibility.
+func normaliseFieldName(name string) string {
+	switch name {
+	case "CONTAINERNAME":
+		return "CONTAINER_NAME"
+	case "HOSTNAME":
+		return "CONTAINER_HOSTNAME"
+	case "IMAGE":
+		return "CONTAINER_IMAGE"
+	case "CONTAINERID":
+		return "CONTAINER_ID"
+	default:
+		return name
+	}
+}
+
 // fieldValues returns the values to match against for the given container
-// and list of field names.
+// and list of field names. Uses the canonical variable-style names.
 func fieldValues(c ContainerInfo, fields []string) []string {
 	var vals []string
 	for _, f := range fields {
 		switch f {
-		case "containername":
+		case "CONTAINER_NAME":
 			vals = append(vals, c.Name)
-		case "hostname":
+		case "CONTAINER_HOSTNAME":
 			vals = append(vals, c.Hostname)
-		case "image":
+		case "CONTAINER_IMAGE":
 			vals = append(vals, c.Image)
-		case "containerid":
+		case "CONTAINER_ID":
 			vals = append(vals, c.ID)
 		}
 	}

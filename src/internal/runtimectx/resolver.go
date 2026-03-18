@@ -73,7 +73,7 @@ func (r *DefaultResolver) Resolve(ctx context.Context) (Snapshot, error) {
 			}
 		}
 		if len(excludedPrefixes) > 0 {
-			r.Logger.Debug(fmt.Sprintf("Container runtime: excluding %d CIDR(s) from address selection", len(excludedPrefixes)))
+			r.Logger.Information(fmt.Sprintf("Container runtime: excluding %d CIDR(s) from address selection", len(excludedPrefixes)))
 		}
 	}
 	// Store the detector on the snapshot so the reconciliation pipeline
@@ -85,8 +85,13 @@ func (r *DefaultResolver) Resolve(ctx context.Context) (Snapshot, error) {
 	snap.RFC1918IPv4 = findFirstMatchingAddress(snap.InterfaceAddresses, isRFC1918, excludedPrefixes)
 	snap.CGNATIPv4 = findFirstMatchingAddress(snap.InterfaceAddresses, isCGNAT, excludedPrefixes)
 
-	r.Logger.Debug(fmt.Sprintf("Runtime context resolved: hostname=%s nodeID=%s os=%s arch=%s publicIPv4=%s publicIPv6=%s rfc1918=%s cgnat=%s",
+	r.Logger.Information(fmt.Sprintf("Runtime context resolved: hostname=%s nodeID=%s os=%s arch=%s publicIPv4=%s publicIPv6=%s rfc1918=%s cgnat=%s",
 		snap.Hostname, snap.NodeID, snap.OS, snap.Architecture, snap.PublicIPv4, snap.PublicIPv6, snap.RFC1918IPv4, snap.CGNATIPv4))
+
+	// Log detected interfaces and their addresses at Information level.
+	for ifName, addrs := range snap.InterfaceAddresses {
+		r.Logger.Information(fmt.Sprintf("Interface %s: %v", ifName, addrs))
+	}
 
 	return snap, nil
 }

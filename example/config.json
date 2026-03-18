@@ -117,14 +117,14 @@
             "providerId":  "f86e9515-aea4-475b-bda4-343bb8edc41f",
             "enabled":     true,
             "type":        "A",
-            "name":        "${LABEL:dns.hostname}.${ZONE}",
+            "name":        "${LABEL:dns.public.hostname}.${ZONE}",
             "content":     "${CONTAINER_IP}",
             "comment":     "{'containerName':'${CONTAINER_NAME}','hostname':'${HOSTNAME}','nodeId':'${NODE_ID}'}",
             "include":     [".*"],
             "exclude":     ["^$"],
-            "matchFields": ["auto"],
+            "matchFields": ["${CONTAINER_NAME}", "${CONTAINER_HOSTNAME}", "${CONTAINER_IMAGE}"],
             "tags": [
-                { "name": "service", "value": "${LABEL:dns.hostname}" }
+                { "name": "service", "value": "${LABEL:dns.public.hostname}" }
             ]
         }
     ]

@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/gracesolutions/dns-automatic-updater/internal/config"
@@ -68,6 +69,11 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	name, err := expansion.MustExpand(tmpl.Name, expCtx)
 	if err != nil {
 		r.Logger.Error(fmt.Sprintf("Record %s: name expansion failed: %s", recordID, err))
+		return Result{RecordID: recordID, Action: ActionSkip, Error: err}
+	}
+	if !isValidDNSName(name) {
+		err := fmt.Errorf("expanded name %q is not a valid DNS FQDN", name)
+		r.Logger.Error(fmt.Sprintf("Record %s: %s (skipping)", recordID, err))
 		return Result{RecordID: recordID, Action: ActionSkip, Error: err}
 	}
 	content := addrResult.Address
@@ -256,3 +262,29 @@ func isDuplicateRecordError(err error) bool {
 	return strings.Contains(msg, "already exists") || strings.Contains(msg, "duplicate")
 }
 
+
+// dnsLabelRx matches a single DNS label: 1-63 chars, alphanumeric + hyphens,
+// must not start or end with a hyphen.
+var dnsLabelRx = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
+
+// isValidDNSName checks whether the expanded name is a valid DNS FQDN.
+// It rejects empty names, names with empty labels (consecutive dots),
+// labels longer than 63 chars, and labels containing invalid characters.
+func isValidDNSName(name string) bool {
+	// Strip optional trailing dot.
+	name = strings.TrimSuffix(name, ".")
+	if name == "" {
+		return false
+	}
+	// Total length (without trailing dot) must not exceed 253.
+	if len(name) > 253 {
+		return false
+	}
+	labels := strings.Split(name, ".")
+	for _, label := range labels {
+		if !dnsLabelRx.MatchString(label) {
+			return false
+		}
+	}
+	return true
+}

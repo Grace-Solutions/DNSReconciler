@@ -76,7 +76,7 @@ func (d *DockerClient) ListNetworks(ctx context.Context) ([]NetworkInfo, error) 
 		}
 		networks = append(networks, info)
 	}
-	d.logger.Debug(fmt.Sprintf("Container runtime: Docker returned %d networks", len(networks)))
+	d.logger.Information(fmt.Sprintf("Container runtime: Docker returned %d networks", len(networks)))
 	return networks, nil
 }
 
@@ -139,7 +139,7 @@ func (d *DockerClient) ListContainers(ctx context.Context) ([]ContainerInfo, err
 
 		containers = append(containers, info)
 	}
-	d.logger.Debug(fmt.Sprintf("Container runtime: Docker returned %d running containers", len(containers)))
+	d.logger.Information(fmt.Sprintf("Container runtime: Docker returned %d running containers", len(containers)))
 	return containers, nil
 }
 

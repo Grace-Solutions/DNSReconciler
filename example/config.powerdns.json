@@ -60,7 +60,7 @@
             "providerId":  "c0b2e442-2045-448b-bfc1-a6524932d90d",
             "enabled":     true,
             "type":        "A",
-            "name":        "${LABEL:dns.hostname}.${ZONE}",
+            "name":        "${CONTAINER_NAME}.${ZONE}",
             "content":     "${CONTAINER_IP}",
             "comment":     "{'containerName':'${CONTAINER_NAME}','hostname':'${HOSTNAME}','nodeId':'${NODE_ID}'}",
             "include":     [".*"],

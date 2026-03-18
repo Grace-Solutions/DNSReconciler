@@ -79,7 +79,7 @@ func (p *PodmanClient) ListNetworks(ctx context.Context) ([]NetworkInfo, error) 
 		}
 		networks = append(networks, info)
 	}
-	p.logger.Debug(fmt.Sprintf("Container runtime: Podman returned %d networks", len(networks)))
+	p.logger.Information(fmt.Sprintf("Container runtime: Podman returned %d networks", len(networks)))
 	return networks, nil
 }
 
@@ -140,7 +140,7 @@ func (p *PodmanClient) ListContainers(ctx context.Context) ([]ContainerInfo, err
 
 		containers = append(containers, info)
 	}
-	p.logger.Debug(fmt.Sprintf("Container runtime: Podman returned %d running containers", len(containers)))
+	p.logger.Information(fmt.Sprintf("Container runtime: Podman returned %d running containers", len(containers)))
 	return containers, nil
 }
 

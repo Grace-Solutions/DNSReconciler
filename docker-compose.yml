@@ -47,38 +47,6 @@
 #   them in config.json as "file:/run/secrets/<name>".
 # -------------------------------------------------------
 
-services:
-  dnsreconciler:
-    image: gsoperator/dnsreconciler:latest
-    container_name: dnsreconciler
-    restart: unless-stopped
-    env_file:
-      - .env
-    #command:
-    #  - dnsreconciler
-    #  - -config
-    #  - /config/config.json
-    #  - -schedule
-    #  - "0 0 */4 * * *"
-    volumes:
-      - dnsreconciler_config:/config
-      - dnsreconciler_state:/state
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - DNSReconciler-EXTERNAL
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-
-networks:
-  DNSReconciler-EXTERNAL:
-    external: true
-
-volumes:
-  dnsreconciler_config:
-  dnsreconciler_state:
-
 #secrets:
 #  cf_api_token:
 #    file: ./secrets/cf_api_token
@@ -89,3 +57,56 @@ volumes:
 #  pdns_api_key:
 #    file: ./secrets/pdns_api_key
 
+networks:
+  EXTERNAL:
+    name: DNSRECONCILER-EXTERNAL
+    driver: bridge
+    internal: false
+    attachable: true
+
+volumes:
+  DNSRECONCILER-CONFIG-00001:
+    driver: local
+  DNSRECONCILER-STATE-00001:
+    driver: local
+
+services:
+  dnsreconciler:
+    image: gsoperator/dnsreconciler:latest
+    container_name: DNSRECONCILER-APP-00001
+    restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    logging:
+      driver: 'local'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health"]
+      start_period: 60s
+      interval: 30s
+      retries: 3
+      timeout: 10s
+    networks:
+      EXTERNAL:
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 128M
+          cpus: '0.5'
+    volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - DNSRECONCILER-CONFIG-00001:/config
+      - DNSRECONCILER-STATE-00001:/state
+    environment:
+      DNS_PUBLIC_HOSTNAME: '${DNS_PUBLIC_HOSTNAME:-dnsreconciler.mydomain.local}'
+    labels:
+      dns.public.hostname: ${DNS_PUBLIC_HOSTNAME}
