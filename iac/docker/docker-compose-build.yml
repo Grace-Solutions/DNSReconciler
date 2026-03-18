@@ -1,11 +1,12 @@
 # -------------------------------------------------------
-# DNS Reconciler — Production Compose
+# DNS Reconciler — Local Build Compose
 #
-# Pulls the pre-built image from Docker Hub.
-# For local builds from source, use docker-compose-build.yml instead.
+# Builds the image from source using the Dockerfile.
+# Use this for development or when you want to build
+# your own image rather than pulling from Docker Hub.
 #
 # Usage:
-#   docker compose up -d
+#   docker compose -f docker-compose-build.yml up -d --build
 #
 # Environment:
 #   Copy .env.example to .env and fill in your credentials.
@@ -26,6 +27,9 @@
 
 services:
   dnsreconciler:
+    build:
+      context: ../../
+      dockerfile: iac/docker/Dockerfile
     image: gsoperator/dnsreconciler:latest
     container_name: dnsreconciler
     restart: unless-stopped
