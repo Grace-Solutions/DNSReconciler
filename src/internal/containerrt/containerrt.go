@@ -31,6 +31,7 @@ type NetworkInfo struct {
 type ContainerInfo struct {
 	ID        string
 	Name      string            // human-readable name (leading "/" stripped)
+	Hostname  string            // container hostname (from inspect)
 	Image     string
 	State     string            // running, exited, …
 	Labels    map[string]string

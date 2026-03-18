@@ -110,11 +110,12 @@ type RecordTemplate struct {
 // ContainerMeta holds container-specific metadata attached to a generated
 // RecordTemplate so the reconciler can build the container-aware expansion context.
 type ContainerMeta struct {
-	ContainerName  string
-	ContainerID    string // short ID (12 chars)
-	ContainerIP    string // IP on the routable network
-	ContainerImage string
-	Labels         map[string]string
+	ContainerName     string
+	ContainerHostname string // hostname from container inspect
+	ContainerID       string // short ID (12 chars)
+	ContainerIP       string // IP on the routable network
+	ContainerImage    string
+	Labels            map[string]string
 }
 
 type AddressSelection struct {
@@ -148,19 +149,21 @@ type Tag struct {
 // expansion time so providers with structured tag support can match ownership
 // without being constrained by comment length limits.
 type ContainerRecordTemplate struct {
-	ProviderID  string            `json:"providerId"`
-	TemplateID  string            `json:"templateId"`
-	Enabled     *bool             `json:"enabled,omitempty"`
-	Type        string            `json:"type"`
-	Name        string            `json:"name"`
-	Content     string            `json:"content"`
-	Zone        string            `json:"zone,omitempty"`
-	TTL         *int              `json:"ttl,omitempty"`
-	Proxied     *bool             `json:"proxied,omitempty"`
-	Comment     string            `json:"comment,omitempty"`
-	Tags        []Tag             `json:"tags,omitempty"`
-	Ownership   string            `json:"ownership,omitempty"`
-	LabelFilter map[string]string `json:"labelFilter,omitempty"`
+	Description string   `json:"description,omitempty"`
+	ProviderID  string   `json:"providerId"`
+	Enabled     *bool    `json:"enabled,omitempty"`
+	Type        string   `json:"type"`
+	Name        string   `json:"name"`
+	Content     string   `json:"content"`
+	Zone        string   `json:"zone,omitempty"`
+	TTL         *int     `json:"ttl,omitempty"`
+	Proxied     *bool    `json:"proxied,omitempty"`
+	Comment     string   `json:"comment,omitempty"`
+	Tags        []Tag    `json:"tags,omitempty"`
+	Ownership   string   `json:"ownership,omitempty"`
+	Include     []string `json:"include,omitempty"`
+	Exclude     []string `json:"exclude,omitempty"`
+	MatchFields []string `json:"matchFields,omitempty"`
 }
 
 // IsEnabled returns whether this container record template is active.

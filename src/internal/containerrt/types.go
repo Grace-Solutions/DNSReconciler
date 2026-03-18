@@ -37,6 +37,13 @@ type dockerContainerNetwork struct {
 	Gateway    string `json:"Gateway"`
 }
 
+// dockerInspect is the subset of /containers/{id}/json we need.
+type dockerInspect struct {
+	Config struct {
+		Hostname string `json:"Hostname"`
+	} `json:"Config"`
+}
+
 // --- Helpers ---
 
 // isSocket returns true if path exists and is a Unix domain socket.

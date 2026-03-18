@@ -422,6 +422,7 @@ The following variables are available **only** inside `containerRecords[]` templ
 | Variable | Source | Example value |
 |----------|--------|---------------|
 | `${CONTAINER_NAME}` | Container name | `web-frontend` |
+| `${CONTAINER_HOSTNAME}` | Container hostname (from inspect) | `web-frontend` |
 | `${CONTAINER_ID}` | Short 12-char container ID | `a1b2c3d4e5f6` |
 | `${CONTAINER_IP}` | IP on the routable network | `172.16.16.200` |
 | `${CONTAINER_IMAGE}` | Container image name | `nginx:alpine` |
@@ -451,15 +452,15 @@ Containers running on L2-routable networks (IPVLAN or MACVLAN) can be automatica
 2. **Network filtering** — only networks with `ipvlan` or `macvlan` drivers are considered. Bridge, overlay, and host networks are ignored because their addresses are not directly routable on the LAN.
 3. **Container enumeration** — running containers attached to a qualifying network are discovered via the Engine REST API.
 4. **Template expansion** — each `containerRecords[]` template is expanded once per discovered container, substituting container-specific variables.
-5. **Deterministic IDs** — a stable record ID is generated from `SHA-256(templateId + containerId)`, ensuring consistent ownership tracking across restarts.
+5. **Deterministic IDs** — a stable record ID is generated from `SHA-256(providerId|type|name + containerId)`, ensuring consistent ownership tracking across restarts.
 6. **Ownership injection** — three tags (`nodeId`, `containerName`, `containerId`) are auto-injected into every generated record. Providers with structured tag support (Cloudflare, Azure) use these for ownership matching. Providers without tag support (Technitium, PowerDNS) fall back to comment-based ownership; the auto-injected tags are stripped before the API call.
 
 ### `containerRecords[]` schema
 
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
+| `description` | `string` | No | Human-readable description of this template |
 | `providerId` | `string` | Yes | References a provider by `id` or `friendlyName` |
-| `templateId` | `string` | Yes | Unique identifier for this template (used in deterministic ID generation) |
 | `enabled` | `bool` | No | Default `true` |
 | `type` | `string` | Yes | `A` or `AAAA` |
 | `name` | `string` | Yes | FQDN template (supports variable expansion including `${LABEL:key}`) |
@@ -470,7 +471,9 @@ Containers running on L2-routable networks (IPVLAN or MACVLAN) can be automatica
 | `comment` | `string` | No | Ownership comment (supports variable expansion) |
 | `tags` | `array` | No | Additional tags (supports variable expansion) |
 | `ownership` | `string` | No | `perNode` (default), `singleton`, `manual`, `disabled` |
-| `labelFilter` | `object` | No | Key/value pairs — only containers whose labels match all entries are included |
+| `include` | `array` | No | Regex patterns — a container must match at least one to be included (empty = include all) |
+| `exclude` | `array` | No | Regex patterns — a container matching any pattern is excluded (takes precedence over include) |
+| `matchFields` | `array` | No | Container fields to match against: `auto` (default), `containername`, `hostname`, `image`, `containerid`. `auto` expands to `containername` + `hostname`. |
 
 ### Container label convention
 
@@ -487,7 +490,6 @@ Then reference it in the template:
 
 ```json
 {
-  "templateId": "macvlan-service-record",
   "type": "A",
   "name": "${LABEL:dns.hostname}.${ZONE}",
   "content": "${CONTAINER_IP}",

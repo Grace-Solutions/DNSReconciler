@@ -133,10 +133,29 @@ func (p *PodmanClient) ListContainers(ctx context.Context) ([]ContainerInfo, err
 				}
 			}
 		}
+		// Fetch hostname via inspect.
+		if hostname, err := p.inspectHostname(ctx, c.ID); err == nil {
+			info.Hostname = hostname
+		}
+
 		containers = append(containers, info)
 	}
 	p.logger.Debug(fmt.Sprintf("Container runtime: Podman returned %d running containers", len(containers)))
 	return containers, nil
+}
+
+// inspectHostname retrieves the container hostname from /containers/{id}/json.
+func (p *PodmanClient) inspectHostname(ctx context.Context, id string) (string, error) {
+	body, err := p.get(ctx, "/containers/"+id+"/json")
+	if err != nil {
+		return "", err
+	}
+	defer body.Close()
+	var insp dockerInspect
+	if err := json.NewDecoder(body).Decode(&insp); err != nil {
+		return "", err
+	}
+	return insp.Config.Hostname, nil
 }
 
 func (p *PodmanClient) get(ctx context.Context, path string) (io.ReadCloser, error) {

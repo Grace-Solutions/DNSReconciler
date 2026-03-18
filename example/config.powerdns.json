@@ -53,14 +53,16 @@
 
     "containerRecords": [
         {
-            "_comment":    "Creates A records for containers on MACVLAN networks using the dns.hostname label",
+            "description": "Creates A records for containers on MACVLAN networks using the dns.hostname label",
             "providerId":  "c0b2e442-2045-448b-bfc1-a6524932d90d",
-            "templateId":  "macvlan-service-record",
             "enabled":     true,
             "type":        "A",
             "name":        "${LABEL:dns.hostname}.${ZONE}",
             "content":     "${CONTAINER_IP}",
-            "comment":     "{'containerName':'${CONTAINER_NAME}','hostname':'${HOSTNAME}','nodeId':'${NODE_ID}'}"
+            "comment":     "{'containerName':'${CONTAINER_NAME}','hostname':'${HOSTNAME}','nodeId':'${NODE_ID}'}",
+            "include":     [".*"],
+            "exclude":     [],
+            "matchFields": ["auto"]
         }
     ]
 }

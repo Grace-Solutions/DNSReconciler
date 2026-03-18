@@ -53,11 +53,12 @@ func (r *Reconciler) reconcileOne(ctx context.Context, tmpl config.RecordTemplat
 	var expCtx expansion.Context
 	if tmpl.ContainerMeta != nil {
 		cv := expansion.ContainerVars{
-			ContainerName:  tmpl.ContainerMeta.ContainerName,
-			ContainerID:    tmpl.ContainerMeta.ContainerID,
-			ContainerIP:    tmpl.ContainerMeta.ContainerIP,
-			ContainerImage: tmpl.ContainerMeta.ContainerImage,
-			Labels:         tmpl.ContainerMeta.Labels,
+			ContainerName:     tmpl.ContainerMeta.ContainerName,
+			ContainerHostname: tmpl.ContainerMeta.ContainerHostname,
+			ContainerID:       tmpl.ContainerMeta.ContainerID,
+			ContainerIP:       tmpl.ContainerMeta.ContainerIP,
+			ContainerImage:    tmpl.ContainerMeta.ContainerImage,
+			Labels:            tmpl.ContainerMeta.Labels,
 		}
 		expCtx = expansion.BuildContainerContext(r.Snapshot, rv, cv)
 	} else {

@@ -5,12 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
+)
+
+const (
+	remoteMaxRetries    = 5
+	remoteInitialDelay  = 1 * time.Second
+	remoteMaxDelay      = 16 * time.Second
+	remoteBackoffFactor = 2
 )
 
 // RemoteRequest describes how to fetch configuration from a remote URL.
@@ -75,20 +83,65 @@ func LoadFromURL(req RemoteRequest) (Config, error) {
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return Config{}, fmt.Errorf("remote config fetch failed: %w", err)
-	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return Config{}, fmt.Errorf("remote config returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(snippet)))
+	var raw []byte
+	delay := remoteInitialDelay
+	var lastErr error
+
+	for attempt := 0; attempt <= remoteMaxRetries; attempt++ {
+		if attempt > 0 {
+			log.Printf("[Information] - Remote config: retry %d/%d in %s", attempt, remoteMaxRetries, delay)
+			time.Sleep(delay)
+			delay *= remoteBackoffFactor
+			if delay > remoteMaxDelay {
+				delay = remoteMaxDelay
+			}
+
+			// Rebuild the request for retry (body may have been consumed)
+			httpReq, err = http.NewRequest(method, req.URL, nil)
+			if err != nil {
+				return Config{}, fmt.Errorf("create remote config request: %w", err)
+			}
+			httpReq.Header.Set("Accept", "application/json")
+			if method == http.MethodPost {
+				data, _ := json.Marshal(buildIdentityPayload())
+				httpReq.Body = io.NopCloser(bytes.NewReader(data))
+				httpReq.Header.Set("Content-Type", "application/json")
+			}
+			if req.Header != "" && req.Token != "" {
+				httpReq.Header.Set(req.Header, req.Token)
+			}
+		}
+
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			lastErr = fmt.Errorf("remote config fetch failed: %w", err)
+			log.Printf("[Warning] - Remote config: attempt %d failed: %s", attempt+1, lastErr)
+			continue
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			resp.Body.Close()
+			lastErr = fmt.Errorf("remote config returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(snippet)))
+			log.Printf("[Warning] - Remote config: attempt %d returned HTTP %d", attempt+1, resp.StatusCode)
+			continue
+		}
+
+		raw, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("read remote config response: %w", err)
+			log.Printf("[Warning] - Remote config: attempt %d read failed: %s", attempt+1, lastErr)
+			continue
+		}
+
+		lastErr = nil
+		break
 	}
 
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return Config{}, fmt.Errorf("read remote config response: %w", err)
+	if lastErr != nil {
+		return Config{}, fmt.Errorf("remote config failed after %d attempts: %w", remoteMaxRetries+1, lastErr)
 	}
 
 	var cfg Config

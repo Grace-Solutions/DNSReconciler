@@ -17,11 +17,12 @@ type RecordVars struct {
 // ContainerVars holds per-container values injected into the expansion
 // context when processing containerRecords templates.
 type ContainerVars struct {
-	ContainerName  string
-	ContainerID    string // short (12-char) container ID
-	ContainerIP    string // IP on the routable network
-	ContainerImage string
-	Labels         map[string]string
+	ContainerName     string
+	ContainerHostname string // container hostname (from inspect)
+	ContainerID       string // short (12-char) container ID
+	ContainerIP       string // IP on the routable network
+	ContainerImage    string
+	Labels            map[string]string
 }
 
 // BuildContext creates a full expansion Context from the runtime snapshot
@@ -51,6 +52,7 @@ func BuildContext(snap runtimectx.Snapshot, rv RecordVars) Context {
 func BuildContainerContext(snap runtimectx.Snapshot, rv RecordVars, cv ContainerVars) Context {
 	ctx := BuildContext(snap, rv)
 	ctx["CONTAINER_NAME"] = cv.ContainerName
+	ctx["CONTAINER_HOSTNAME"] = cv.ContainerHostname
 	ctx["CONTAINER_ID"] = cv.ContainerID
 	ctx["CONTAINER_IP"] = cv.ContainerIP
 	ctx["CONTAINER_IMAGE"] = cv.ContainerImage

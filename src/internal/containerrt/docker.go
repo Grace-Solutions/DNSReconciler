@@ -132,10 +132,29 @@ func (d *DockerClient) ListContainers(ctx context.Context) ([]ContainerInfo, err
 				}
 			}
 		}
+		// Fetch hostname via inspect.
+		if hostname, err := d.inspectHostname(ctx, c.ID); err == nil {
+			info.Hostname = hostname
+		}
+
 		containers = append(containers, info)
 	}
 	d.logger.Debug(fmt.Sprintf("Container runtime: Docker returned %d running containers", len(containers)))
 	return containers, nil
+}
+
+// inspectHostname retrieves the container hostname from /containers/{id}/json.
+func (d *DockerClient) inspectHostname(ctx context.Context, id string) (string, error) {
+	body, err := d.get(ctx, "/containers/"+id+"/json")
+	if err != nil {
+		return "", err
+	}
+	defer body.Close()
+	var insp dockerInspect
+	if err := json.NewDecoder(body).Decode(&insp); err != nil {
+		return "", err
+	}
+	return insp.Config.Hostname, nil
 }
 
 func (d *DockerClient) get(ctx context.Context, path string) (io.ReadCloser, error) {

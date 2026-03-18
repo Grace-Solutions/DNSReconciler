@@ -12,8 +12,9 @@ import (
 
 // ExpandContainerRecords discovers routable containers and generates a
 // concrete RecordTemplate for each (containerRecord template × container) pair.
-// The generated recordId is deterministic: SHA-256(templateId + containerID)
-// truncated to UUID format so re-runs produce stable IDs.
+// The generated recordId is deterministic: SHA-256(templateKey + containerID)
+// where templateKey is derived from providerId + type + name, ensuring stable
+// IDs across restarts without requiring a user-supplied templateId.
 func ExpandContainerRecords(
 	ctx context.Context,
 	logger *logging.Logger,
@@ -29,26 +30,31 @@ func ExpandContainerRecords(
 
 	var generated []config.RecordTemplate
 
-	for _, ct := range cfg.ContainerRecords {
+	for i, ct := range cfg.ContainerRecords {
+		templateLabel := fmt.Sprintf("[%d] %s/%s", i, ct.Type, ct.Name)
+
 		if !ct.IsEnabled() {
-			logger.Debug(fmt.Sprintf("Container template %s is disabled, skipping", ct.TemplateID))
+			logger.Debug(fmt.Sprintf("Container template %s is disabled, skipping", templateLabel))
 			continue
 		}
 
 		prov := cfg.FindProvider(ct.ProviderID)
 		merged := config.MergeContainerDefaults(ct, prov)
 
-		// Discover containers matching this template's label filter.
-		containers := detector.RoutableContainers(ctx, merged.LabelFilter)
+		// Derive a stable template key from the required fields.
+		templateKey := merged.ProviderID + "|" + merged.Type + "|" + merged.Name
+
+		// Discover containers matching this template's include/exclude filters.
+		containers := detector.RoutableContainers(ctx, merged.Include, merged.Exclude, merged.MatchFields)
 		if len(containers) == 0 {
-			logger.Debug(fmt.Sprintf("Container template %s: no matching containers found", ct.TemplateID))
+			logger.Debug(fmt.Sprintf("Container template %s: no matching containers found", templateLabel))
 			continue
 		}
 
-		logger.Information(fmt.Sprintf("Container template %s: found %d routable container(s)", ct.TemplateID, len(containers)))
+		logger.Information(fmt.Sprintf("Container template %s: found %d routable container(s)", templateLabel, len(containers)))
 
 		for _, rc := range containers {
-			recordID := deterministicID(merged.TemplateID, rc.ID)
+			recordID := deterministicID(templateKey, rc.ID)
 
 			// Auto-inject ownership tags using variable references. These
 			// are expanded alongside user tags in reconcileOne. If the
@@ -86,16 +92,17 @@ func ExpandContainerRecords(
 				// Store container metadata so reconcileOne can build the
 				// container-aware expansion context.
 				ContainerMeta: &config.ContainerMeta{
-					ContainerName:  rc.Name,
-					ContainerID:    shortID(rc.ID),
-					ContainerIP:    rc.RoutableIP,
-					ContainerImage: rc.Image,
-					Labels:         rc.Labels,
+					ContainerName:     rc.Name,
+					ContainerHostname: rc.Hostname,
+					ContainerID:       shortID(rc.ID),
+					ContainerIP:       rc.RoutableIP,
+					ContainerImage:    rc.Image,
+					Labels:            rc.Labels,
 				},
 			}
 
 			logger.Debug(fmt.Sprintf("Container template %s → record %s for container %q (%s)",
-				ct.TemplateID, recordID, rc.Name, rc.RoutableIP))
+				templateLabel, recordID, rc.Name, rc.RoutableIP))
 
 			generated = append(generated, rec)
 		}
@@ -104,10 +111,10 @@ func ExpandContainerRecords(
 	return generated
 }
 
-// deterministicID produces a stable UUID-formatted ID from a template ID and
+// deterministicID produces a stable UUID-formatted ID from a template key and
 // container ID so the same container always maps to the same record.
-func deterministicID(templateID, containerID string) string {
-	h := sha256.Sum256([]byte(templateID + ":" + containerID))
+func deterministicID(templateKey, containerID string) string {
+	h := sha256.Sum256([]byte(templateKey + ":" + containerID))
 	// Format as UUID v4-like: xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx
 	return fmt.Sprintf("%x-%x-4%x-8%x-%x",
 		h[0:4], h[4:6], h[6:8], h[8:10], h[10:16])
