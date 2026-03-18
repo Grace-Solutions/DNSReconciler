@@ -12,11 +12,13 @@ import (
 const defaultConfigJSON = `{
     "settings": {
         "runtime": {
-            "reconcileIntervalSeconds": 120,
-            "statePath":                "./state.json",
-            "cleanupOnShutdown":        false,
-            "logLevel":                 "Information",
-            "dryRun":                   false
+            "schedule":          "0 0 */4 * * *",
+            "jitter":            "auto",
+            "timezone":          "UTC",
+            "statePath":         "./state.json",
+            "cleanupOnShutdown": false,
+            "logLevel":          "Information",
+            "dryRun":            false
         },
         "network": {
             "addressSources": [

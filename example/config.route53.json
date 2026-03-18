@@ -1,7 +1,9 @@
 {
     "settings": {
         "runtime": {
-            "reconcileIntervalSeconds": 120,
+            "schedule":          "0 0 */4 * * *",
+            "jitter":            "auto",
+            "timezone":          "UTC",
             "cleanupOnShutdown":        true,
             "logLevel":                 "Information",
             "dryRun":                   false

@@ -844,7 +844,9 @@ Required workflow rules:
     "technitium": {}
   },
   "runtime": {
-    "reconcileIntervalSeconds": 120,
+    "schedule": "0 0 */4 * * *",
+    "jitter": "auto",
+    "timezone": "UTC",
     "statePath": "./state.json",
     "cleanupOnShutdown": true,
     "logLevel": "Information",

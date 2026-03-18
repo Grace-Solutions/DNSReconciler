@@ -24,11 +24,13 @@ type SettingsConfig struct {
 
 // RuntimeConfig holds scheduler, state, and logging settings.
 type RuntimeConfig struct {
-	ReconcileIntervalSeconds int    `json:"reconcileIntervalSeconds"`
-	StatePath                string `json:"statePath"`
-	CleanupOnShutdown        bool   `json:"cleanupOnShutdown"`
-	LogLevel                 string `json:"logLevel"`
-	DryRun                   bool   `json:"dryRun"`
+	Schedule          string `json:"schedule"`
+	Jitter            string `json:"jitter,omitempty"`
+	Timezone          string `json:"timezone,omitempty"`
+	StatePath         string `json:"statePath"`
+	CleanupOnShutdown bool   `json:"cleanupOnShutdown"`
+	LogLevel          string `json:"logLevel"`
+	DryRun            bool   `json:"dryRun"`
 }
 
 // NetworkConfig holds address source configuration.
@@ -180,8 +182,14 @@ func (c *Config) FindProvider(id string) *ProviderEntry {
 
 // ApplyBuiltInDefaults fills in zero-valued runtime settings with sensible defaults.
 func (c *Config) ApplyBuiltInDefaults() {
-	if c.Settings.Runtime.ReconcileIntervalSeconds == 0 {
-		c.Settings.Runtime.ReconcileIntervalSeconds = 120
+	if c.Settings.Runtime.Schedule == "" {
+		c.Settings.Runtime.Schedule = "0 0 */4 * * *"
+	}
+	if c.Settings.Runtime.Jitter == "" {
+		c.Settings.Runtime.Jitter = "auto"
+	}
+	if c.Settings.Runtime.Timezone == "" {
+		c.Settings.Runtime.Timezone = "UTC"
 	}
 	if c.Settings.Runtime.StatePath == "" {
 		c.Settings.Runtime.StatePath = "./state.json"

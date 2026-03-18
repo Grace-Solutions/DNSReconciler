@@ -92,11 +92,11 @@ func (a Application) run(command Command) error {
 		return err
 	}
 
-	// Apply CLI/env interval override before anything reads it
-	if command.OverrideInterval > 0 {
-		a.logger.Information(fmt.Sprintf("Overriding reconcile interval: %ds → %ds",
-			cfg.Settings.Runtime.ReconcileIntervalSeconds, command.OverrideInterval))
-		cfg.Settings.Runtime.ReconcileIntervalSeconds = command.OverrideInterval
+	// Apply CLI/env schedule override before anything reads it
+	if command.OverrideSchedule != "" {
+		a.logger.Information(fmt.Sprintf("Overriding schedule: %q → %q",
+			cfg.Settings.Runtime.Schedule, command.OverrideSchedule))
+		cfg.Settings.Runtime.Schedule = command.OverrideSchedule
 	}
 
 	// §21.1 step 3: initialize centralized logger
@@ -217,12 +217,23 @@ func (a Application) run(command Command) error {
 	// Launch goroutine that reloads config when the file changes.
 	go a.watchConfigReload(ctx, command, rs, configChanged)
 
-	sched := scheduler.New(a.logger, scheduler.Config{
-		IntervalSeconds: cfg.Settings.Runtime.ReconcileIntervalSeconds,
-		JitterPercent:   10,
-	}, reconcileOnce)
+	loc, err := scheduler.ResolveTimezone(cfg.Settings.Runtime.Timezone)
+	if err != nil {
+		return fmt.Errorf("timezone resolution failed: %w", err)
+	}
+	a.logger.Information(fmt.Sprintf("Scheduler timezone: %s", loc))
 
-	a.logger.Information(fmt.Sprintf("Starting scheduler (interval=%ds)", cfg.Settings.Runtime.ReconcileIntervalSeconds))
+	sched, err := scheduler.New(a.logger, scheduler.Config{
+		Schedule: cfg.Settings.Runtime.Schedule,
+		Jitter:   cfg.Settings.Runtime.Jitter,
+		Location: loc,
+	}, reconcileOnce)
+	if err != nil {
+		return fmt.Errorf("scheduler init failed: %w", err)
+	}
+
+	a.logger.Information(fmt.Sprintf("Starting scheduler (schedule=%q, jitter=%s, tz=%s)",
+		cfg.Settings.Runtime.Schedule, cfg.Settings.Runtime.Jitter, loc))
 	err = sched.Run(ctx)
 	if err != nil && err != context.Canceled {
 		return err
@@ -273,8 +284,8 @@ func (a Application) watchConfigReload(ctx context.Context, command Command, rs 
 			}
 
 			// Re-apply CLI overrides
-			if command.OverrideInterval > 0 {
-				newCfg.Settings.Runtime.ReconcileIntervalSeconds = command.OverrideInterval
+			if command.OverrideSchedule != "" {
+				newCfg.Settings.Runtime.Schedule = command.OverrideSchedule
 			}
 
 			a.logger.SetLevel(logging.ParseLevel(newCfg.Settings.Runtime.LogLevel))

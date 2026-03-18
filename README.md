@@ -54,8 +54,8 @@ This makes it ideal for:
 | **Config hot-reload** | Polling-based file watcher detects `config.json` modifications and reloads configuration without restarting the service. |
 | **Idempotent reconciliation** | Fingerprint-based diffing; no changes applied if local state matches desired state. |
 | **Graceful cleanup** | Optional: delete all owned records on `SIGINT`/`SIGTERM` shutdown. |
-| **Jittered scheduler** | Configurable interval with ±10% random jitter to prevent startup stampedes. |
-| **Interval override** | Change the reconcile interval via `-interval` CLI flag or `RECONCILE_INTERVAL_SECONDS` env var without editing config. |
+| **Cron scheduler** | 6-field cron expressions (seconds enabled) with timezone support and configurable jitter. |
+| **Schedule override** | Change the reconcile schedule via `-schedule` CLI flag or `RECONCILE_SCHEDULE` env var without editing config. |
 | **Auto-generated config** | If the config file doesn't exist on first run, a working default is written automatically. |
 | **Service lifecycle** | Idempotent `install`, `uninstall`, `start`, `stop`, and `init` (install + start) via `sc.exe` (Windows), `systemctl` (Linux), `launchctl` (macOS). |
 | **Centralized logging** | All HTTP requests, provider operations, plan detection, and config reloads are logged with timing and status information. |
@@ -191,14 +191,14 @@ dnsreconciler [flags]
 | `-config <path>` | `./config.json` | Path to the JSON configuration file |
 | `-state <path>` | *(from config)* | Override the state file path |
 | `-node-id <id>` | *(auto-detected)* | Explicit node identity |
-| `-interval <seconds>` | *(from config)* | Override the reconcile interval |
+| `-schedule <cron>` | *(from config)* | Override the cron schedule (6-field, seconds enabled) |
 | `-once` | `false` | Run a single reconciliation pass and exit |
 
 **Environment variable overrides:**
 
 | Variable | Equivalent flag |
 |----------|----------------|
-| `RECONCILE_INTERVAL_SECONDS` | `-interval` |
+| `RECONCILE_SCHEDULE` | `-schedule` |
 
 Priority: CLI flag > environment variable > config file.
 
@@ -239,7 +239,7 @@ A full annotated example is at [`example/config.json`](example/config.json).
 ```json
 {
   "settings": {
-    "runtime": { "reconcileIntervalSeconds": 120 }
+    "runtime": { "schedule": "0 0 */4 * * *", "jitter": "auto", "timezone": "UTC" }
   },
   "providers": [
     {
@@ -314,7 +314,9 @@ All credential fields support three syntaxes:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `reconcileIntervalSeconds` | `int` | `120` | Seconds between reconciliation cycles |
+| `schedule` | `string` | `0 0 */4 * * *` | 6-field cron expression (seconds enabled). Default: every 4 hours. |
+| `jitter` | `string` | `auto` | `auto` (10% of interval), `disabled`, or a Go duration (e.g. `30s`, `5m`). |
+| `timezone` | `string` | `UTC` | Unix timezone name (e.g. `America/New_York`). `auto` reads from `TZ` env var or `/etc/timezone`. |
 | `statePath` | `string` | `./state.json` | Path to the local state persistence file |
 | `cleanupOnShutdown` | `bool` | `false` | Delete all owned records on graceful shutdown |
 | `logLevel` | `string` | `Information` | One of: `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical` |
@@ -588,7 +590,7 @@ All variables in `.env` are injected into the container and can be referenced in
 |----------|---------|-------------|
 | `PUID` | `1000` | Container user ID — match your host user |
 | `PGID` | `1000` | Container group ID — match your host group |
-| `RECONCILE_INTERVAL_SECONDS` | *(unset)* | Override the config file's interval |
+| `RECONCILE_SCHEDULE` | *(unset)* | Override the config file's cron schedule |
 
 For example, if your `.env` contains `MY_CF_TOKEN=sk-abc123`, reference it in config as `"apiToken": "env:MY_CF_TOKEN"`. This works for every credential field across all providers — Cloudflare, Technitium, PowerDNS, Route53, and Azure.
 
@@ -674,7 +676,7 @@ Each cycle follows these steps:
 9. **Apply changes** — create, update, or delete records as needed (skip if fingerprint matches).
 10. **Persist state** — save updated fingerprints and metadata to the state file.
 
-In `--once` mode, a single cycle runs and the process exits. In continuous mode, the scheduler repeats the cycle on the configured interval with jitter. Config changes are detected automatically and applied before the next pass.
+In `--once` mode, a single cycle runs and the process exits. In continuous mode, the scheduler repeats the cycle on the configured cron schedule with optional jitter. Config changes are detected automatically and applied before the next pass.
 
 ### Ownership model
 
@@ -782,7 +784,7 @@ docker compose build
 │       │   └── technitium/        # Technitium DNS Server implementation
 │       ├── reconcile/             # Reconciliation pipeline
 │       ├── runtimectx/            # Host runtime context resolver
-│       ├── scheduler/             # Jittered interval scheduler
+│       ├── scheduler/             # Cron-based scheduler with jitter
 │       ├── service/               # Platform service managers (Windows/Linux/macOS)
 │       ├── state/                 # Local state persistence (JSON)
 │       └── watcher/               # Polling-based config file watcher
