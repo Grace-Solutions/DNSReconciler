@@ -62,7 +62,7 @@
             "content":     "${CONTAINER_IP}",
             "comment":     "{'containerName':'${CONTAINER_NAME}','hostname':'${HOSTNAME}','nodeId':'${NODE_ID}'}",
             "include":     [".*"],
-            "exclude":     [],
+            "exclude":     ["^$"],
             "matchFields": ["auto"]
         }
     ]

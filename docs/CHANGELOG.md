@@ -28,7 +28,8 @@
 - **Container variables** — `${CONTAINER_NAME}`, `${CONTAINER_ID}`, `${CONTAINER_IP}`, `${CONTAINER_IMAGE}`, and label lookups via `${LABEL:key}` syntax.
 - **Auto-injected ownership tags** — every container-generated record receives `nodeId`, `containerName`, and `containerId` tags automatically. Providers without structured tag support (Technitium, PowerDNS) have these stripped before the API call.
 - **Deterministic record IDs** — container records use `SHA-256(providerId|type|name + containerId)` for stable ownership tracking across restarts. No user-supplied `templateId` required.
-- **Regex container filtering** — container record templates support `include` and `exclude` regex arrays with configurable `matchFields` (`auto`, `containername`, `hostname`, `image`, `containerid`).
+- **Regex container filtering** — container record templates support `include` and `exclude` regex arrays with configurable `matchFields` (`auto`, `containername`, `hostname`, `image`, `containerid`). Default exclude is `["^$"]` (matches nothing).
+- **`description` field** — container record templates now use a formal `description` field instead of `_comment`.
 - **Docker socket mount** — `docker-compose.yml` updated with optional read-only Docker socket mount for container discovery.
 
 ### Changed

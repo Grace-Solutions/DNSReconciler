@@ -472,7 +472,7 @@ Containers running on L2-routable networks (IPVLAN or MACVLAN) can be automatica
 | `tags` | `array` | No | Additional tags (supports variable expansion) |
 | `ownership` | `string` | No | `perNode` (default), `singleton`, `manual`, `disabled` |
 | `include` | `array` | No | Regex patterns — a container must match at least one to be included (empty = include all) |
-| `exclude` | `array` | No | Regex patterns — a container matching any pattern is excluded (takes precedence over include) |
+| `exclude` | `array` | No | Regex patterns — a container matching any pattern is excluded (takes precedence over include). Default `["^$"]` (matches nothing). |
 | `matchFields` | `array` | No | Container fields to match against: `auto` (default), `containername`, `hostname`, `image`, `containerid`. `auto` expands to `containername` + `hostname`. |
 
 ### Container label convention
