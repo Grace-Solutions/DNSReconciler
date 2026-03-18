@@ -688,18 +688,70 @@ dnsreconciler service init -name my-dns-agent
 
 ## How reconciliation works
 
+```mermaid
+flowchart TD
+    A[Startup] --> B{Config Source?}
+    B -->|Local file| C[Load config.json]
+    B -->|Remote URL| D[Fetch via --config-url]
+    C --> E[Validate & apply defaults]
+    D --> E
+
+    E --> F[Initialize providers]
+    F --> G[Load state file]
+    G --> H{--once mode?}
+    H -->|Yes| I[Run single pass]
+    H -->|No| J[Start cron scheduler]
+
+    J --> K[Start config file watcher]
+    K --> L[Run reconciliation pass]
+    J --> L
+
+    subgraph pass [Reconciliation Pass]
+        direction TB
+        L --> L1[Refresh provider capabilities]
+        L1 --> L2[Resolve runtime context]
+        L2 --> L3[Detect container runtimes]
+        L3 --> L4[Merge defaults — built-in → provider → record]
+        L4 --> L5{containerRecords defined?}
+        L5 -->|Yes| L6[Discover IPVLAN/MACVLAN containers]
+        L6 --> L7[Expand container templates into records]
+        L7 --> L8[Append to record list]
+        L5 -->|No| L8
+        L8 --> L9[For each record: resolve address → expand variables → fingerprint]
+        L9 --> L10[Query provider API for existing records]
+        L10 --> L11{Owned record exists?}
+        L11 -->|No| L12[Create record]
+        L11 -->|Yes| L13{Fingerprint matches?}
+        L13 -->|Yes| L14[Skip — no changes needed]
+        L13 -->|No| L15[Update record]
+    end
+
+    I --> pass
+    L12 --> M[Prune orphaned state entries]
+    L14 --> M
+    L15 --> M
+    M --> N[Persist state to disk]
+    N --> O{--once mode?}
+    O -->|Yes| P[Exit]
+    O -->|No| Q[Wait for next cron tick + jitter]
+    Q --> L
+
+    style pass fill:none,stroke:#6b7280,stroke-dasharray:5 5
+```
+
 Each cycle follows these steps:
 
 1. **Load config** — read and validate `config.json` (auto-create if missing). In continuous mode, a file watcher detects modifications and hot-reloads the config.
 2. **Refresh capabilities** — providers that implement `CapabilityRefresher` (e.g. Cloudflare plan detection) are checked for staleness.
 3. **Resolve runtime context** — detect hostname, OS, architecture, and all network interface addresses.
 4. **Merge defaults** — apply the three-level inheritance chain (built-in → provider → per-record).
-5. **Select addresses** — for each record, walk the priority-sorted source list and pick the winning address.
-6. **Expand variables** — replace `${VAR}` placeholders in all string fields.
-7. **Compute fingerprints** — hash the desired state for each record.
-8. **Diff against provider** — query the DNS provider API for existing records.
-9. **Apply changes** — create, update, or delete records as needed (skip if fingerprint matches).
-10. **Persist state** — save updated fingerprints and metadata to the state file.
+5. **Container discovery** — if `containerRecords` templates are defined, discover containers on IPVLAN/MACVLAN networks and expand each template into concrete records.
+6. **Select addresses** — for each record, walk the priority-sorted source list and pick the winning address.
+7. **Expand variables** — replace `${VAR}` placeholders in all string fields.
+8. **Compute fingerprints** — hash the desired state for each record.
+9. **Diff against provider** — query the DNS provider API for existing records.
+10. **Apply changes** — create, update, or delete records as needed (skip if fingerprint matches).
+11. **Persist state** — save updated fingerprints and metadata to the state file.
 
 In `--once` mode, a single cycle runs and the process exits. In continuous mode, the scheduler repeats the cycle on the configured cron schedule with optional jitter. Config changes are detected automatically and applied before the next pass.
 
