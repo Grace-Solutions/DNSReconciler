@@ -22,7 +22,24 @@
 # Environment:
 #   Copy iac/docker/.env.example to .env in this directory
 #   and fill in your credentials. All variables are loaded
-#   via env_file.
+#   via env_file. Every CLI flag has an env var equivalent:
+#
+#   CONFIG_PATH          — path to config.json (default: /config/config.json)
+#   STATE_PATH           — override state file path
+#   NODE_ID              — explicit node identity
+#   ONCE                 — "true" or "1" for single-pass mode
+#   RECONCILE_SCHEDULE   — 6-field cron override
+#   CONFIG_URL           — remote config URL
+#   CONFIG_HEADER        — HTTP header name for remote auth
+#   CONFIG_TOKEN         — HTTP header value / bearer token
+#   CONFIG_METHOD        — HTTP method: GET (default) or POST
+#   CONFIG_TTL           — re-fetch interval (e.g. 30m, 1h)
+#
+# Command (optional):
+#   The default command is:
+#     dnsreconciler -config /config/config.json
+#   Uncomment and edit the command: below to pass explicit
+#   CLI flags instead of (or in addition to) env vars.
 #
 # Secrets (optional):
 #   To use file-based secrets instead of env vars,
@@ -37,6 +54,12 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    #command:
+    #  - dnsreconciler
+    #  - -config
+    #  - /config/config.json
+    #  - -schedule
+    #  - "0 0 */4 * * *"
     volumes:
       - dnsreconciler_config:/config
       - dnsreconciler_state:/state

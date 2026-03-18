@@ -63,7 +63,31 @@ func parseRun(args []string) (Command, error) {
 		return Command{}, err
 	}
 
-	// Environment variable fallbacks
+	// Environment variable fallbacks — CLI flags take priority over env vars.
+	cfgPath := *configPath
+	if cfgPath == "./config.json" {
+		if envVal := os.Getenv("CONFIG_PATH"); envVal != "" {
+			cfgPath = envVal
+		}
+	}
+	stPath := *statePath
+	if stPath == "" {
+		if envVal := os.Getenv("STATE_PATH"); envVal != "" {
+			stPath = envVal
+		}
+	}
+	nID := *nodeID
+	if nID == "" {
+		if envVal := os.Getenv("NODE_ID"); envVal != "" {
+			nID = envVal
+		}
+	}
+	runOnce := *once
+	if !runOnce {
+		if envVal := os.Getenv("ONCE"); envVal == "true" || envVal == "1" {
+			runOnce = true
+		}
+	}
 	overrideSchedule := *schedule
 	if overrideSchedule == "" {
 		if envVal := os.Getenv("RECONCILE_SCHEDULE"); envVal != "" {
@@ -88,6 +112,12 @@ func parseRun(args []string) (Command, error) {
 			cfgToken = envVal
 		}
 	}
+	cfgMethod := *configMethod
+	if cfgMethod == "GET" {
+		if envVal := os.Getenv("CONFIG_METHOD"); envVal != "" {
+			cfgMethod = envVal
+		}
+	}
 	cfgTTL := *configTTL
 	if cfgTTL == "" {
 		if envVal := os.Getenv("CONFIG_TTL"); envVal != "" {
@@ -97,15 +127,15 @@ func parseRun(args []string) (Command, error) {
 
 	return Command{
 		Kind:             CommandRun,
-		ConfigPath:       *configPath,
-		OverrideState:    *statePath,
-		NodeID:           *nodeID,
-		Once:             *once,
+		ConfigPath:       cfgPath,
+		OverrideState:    stPath,
+		NodeID:           nID,
+		Once:             runOnce,
 		OverrideSchedule: overrideSchedule,
 		ConfigURL:        cfgURL,
 		ConfigHeader:     cfgHeader,
 		ConfigToken:      cfgToken,
-		ConfigMethod:     *configMethod,
+		ConfigMethod:     cfgMethod,
 		ConfigTTL:        cfgTTL,
 	}, nil
 }
