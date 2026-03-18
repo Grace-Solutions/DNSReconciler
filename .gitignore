@@ -27,8 +27,9 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
-.env
+# env file — root .env is tracked as a template;
+# ignore any env overrides in subdirectories
+iac/docker/.env
 
 # Build and release outputs
 Artifacts/*
