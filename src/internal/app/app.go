@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"syscall"
@@ -81,15 +82,33 @@ func (a Application) Run(args []string) error {
 }
 
 func (a Application) run(command Command) error {
-	// Auto-create config if it doesn't exist
-	if _, err := os.Stat(command.ConfigPath); os.IsNotExist(err) {
-		a.logger.Information(fmt.Sprintf("Config file %q not found — generating default config", command.ConfigPath))
-	}
+	var cfg config.Config
+	var err error
 
-	// §21.1 steps 1-2: load and validate config
-	cfg, err := config.Load(command.ConfigPath)
-	if err != nil {
-		return err
+	if command.ConfigURL != "" {
+		// Fetch configuration from remote URL
+		a.logger.Information(fmt.Sprintf("Fetching configuration from %s (%s)", command.ConfigURL, command.ConfigMethod))
+		cfg, err = config.LoadFromURL(config.RemoteRequest{
+			URL:    command.ConfigURL,
+			Method: command.ConfigMethod,
+			Header: command.ConfigHeader,
+			Token:  command.ConfigToken,
+		})
+		if err != nil {
+			return fmt.Errorf("remote config: %w", err)
+		}
+		a.logger.Information("Remote configuration loaded and validated successfully")
+	} else {
+		// Auto-create config if it doesn't exist
+		if _, err := os.Stat(command.ConfigPath); os.IsNotExist(err) {
+			a.logger.Information(fmt.Sprintf("Config file %q not found — generating default config", command.ConfigPath))
+		}
+
+		// §21.1 steps 1-2: load and validate config
+		cfg, err = config.Load(command.ConfigPath)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Apply CLI/env schedule override before anything reads it
@@ -101,6 +120,18 @@ func (a Application) run(command Command) error {
 
 	// §21.1 step 3: initialize centralized logger
 	a.logger.SetLevel(logging.ParseLevel(cfg.Settings.Runtime.LogLevel))
+
+	// Set up rotating log file. Default directory is the binary's directory.
+	logDir := binaryDir()
+	exeName := filepath.Base(executablePath())
+	logFileWriter, err := logging.NewRotatingFileWriter(logDir, exeName)
+	if err != nil {
+		a.logger.Warning(fmt.Sprintf("Failed to initialize log file rotation: %s", err))
+	} else {
+		a.logger.AttachFileWriter(logFileWriter)
+		defer a.logger.CloseFileWriter()
+		a.logger.Information(fmt.Sprintf("Log file rotation enabled: dir=%s, prefix=%s, maxSize=10MB, maxFiles=3", logDir, exeName))
+	}
 
 	// §21.1 step 4: load local state
 	storePath := cfg.Settings.Runtime.StatePath
@@ -366,4 +397,18 @@ func (a Application) handleService(command Command) error {
 	default:
 		return fmt.Errorf("unsupported service action %q", command.ServiceAction)
 	}
+}
+
+// executablePath returns the path to the running binary, falling back to
+// os.Args[0] if os.Executable fails.
+func executablePath() string {
+	if exe, err := os.Executable(); err == nil {
+		return exe
+	}
+	return os.Args[0]
+}
+
+// binaryDir returns the directory containing the running binary.
+func binaryDir() string {
+	return filepath.Dir(executablePath())
 }

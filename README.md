@@ -18,6 +18,7 @@ A single-binary, cross-platform DNS reconciliation agent. Each node detects its 
 - [Docker deployment](#docker-deployment)
 - [Host service lifecycle](#host-service-lifecycle)
 - [How reconciliation works](#how-reconciliation-works)
+- [Log rotation](#log-rotation)
 - [Building from source](#building-from-source)
 - [Project structure](#project-structure)
 - [License](#license)
@@ -59,6 +60,8 @@ This makes it ideal for:
 | **Auto-generated config** | If the config file doesn't exist on first run, a working default is written automatically. |
 | **Service lifecycle** | Idempotent `install`, `uninstall`, `start`, `stop`, and `init` (install + start) via `sc.exe` (Windows), `systemctl` (Linux), `launchctl` (macOS). |
 | **Centralized logging** | All HTTP requests, provider operations, plan detection, and config reloads are logged with timing and status information. |
+| **Log file rotation** | Automatic rotating log files (`<binary>.yyyy.mm.dd.log`) in the binary's directory. Max 3 files at 10 MB each; oldest pruned automatically. |
+| **Remote configuration** | Fetch config from a URL with `--config-url`. Supports authenticated GET/POST with identity payload for node-specific configuration. |
 | **Container service discovery** | Automatic DNS registration for containers on L2-routable networks (IPVLAN/MACVLAN). Queries Docker and Podman Unix sockets directly — no CLI dependency. Label-based hostname expansion via `${LABEL:key}`. |
 | **Docker-native** | Multi-stage Alpine build with `PUID`/`PGID` support and auto-permission entrypoint. |
 | **Credential flexibility** | Direct values, `env:VAR_NAME`, or `file:/path/to/secret`. Secrets are never logged. |
@@ -189,16 +192,36 @@ dnsreconciler [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-config <path>` | `./config.json` | Path to the JSON configuration file |
+| `-config-url <url>` | *(none)* | Fetch configuration from a remote URL instead of (or before) a local file |
+| `-config-header <name>` | *(none)* | HTTP header name for remote config authentication (e.g. `Authorization`) |
+| `-config-token <value>` | *(none)* | HTTP header value for remote config authentication |
+| `-config-method <method>` | `GET` | HTTP method for remote config (`GET` or `POST`) |
 | `-state <path>` | *(from config)* | Override the state file path |
 | `-node-id <id>` | *(auto-detected)* | Explicit node identity |
 | `-schedule <cron>` | *(from config)* | Override the cron schedule (6-field, seconds enabled) |
 | `-once` | `false` | Run a single reconciliation pass and exit |
+
+When `-config-method POST` is used, the reconciler sends a JSON identity payload to the remote endpoint:
+
+```json
+{
+  "hostname": "web-01",
+  "nodeId": "ba9298a1-c5b2-4431-b3a4-7f0347e971b5",
+  "osInfo": { "os": "linux", "architecture": "amd64" },
+  "ipInfo": { "rfc1918IPv4": "192.168.1.10" }
+}
+```
+
+The remote endpoint can use this information to return node-specific configuration.
 
 **Environment variable overrides:**
 
 | Variable | Equivalent flag |
 |----------|----------------|
 | `RECONCILE_SCHEDULE` | `-schedule` |
+| `CONFIG_URL` | `-config-url` |
+| `CONFIG_HEADER` | `-config-header` |
+| `CONFIG_TOKEN` | `-config-token` |
 
 Priority: CLI flag > environment variable > config file.
 
@@ -695,6 +718,21 @@ When `cleanupOnShutdown` is `true` and the process receives `SIGINT` or `SIGTERM
 2. A cleanup phase runs with a 30-second timeout on a fresh context.
 3. All records owned by this node are deleted from their providers.
 4. The state file is updated.
+
+---
+
+## Log rotation
+
+The reconciler automatically writes logs to rotating files alongside stderr output.
+
+| Setting | Value |
+|---------|-------|
+| **File name** | `<binary>.yyyy.mm.dd.log` (e.g. `dnsreconciler.2026.03.18.log`) |
+| **Max file size** | 10 MB per file |
+| **Max file count** | 3 (oldest pruned automatically) |
+| **Default directory** | Same directory as the running binary |
+
+Log files are created automatically on startup. If the log directory is not writable, a warning is logged to stderr and the reconciler continues without file logging.
 
 ---
 

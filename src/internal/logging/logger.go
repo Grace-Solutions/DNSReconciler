@@ -25,9 +25,10 @@ var levelOrder = map[Level]int{
 }
 
 type Logger struct {
-	mu     sync.Mutex
-	writer io.Writer
-	level  Level
+	mu         sync.Mutex
+	writer     io.Writer
+	fileWriter *RotatingFileWriter
+	level      Level
 }
 
 func New(writer io.Writer, level Level) *Logger {
@@ -35,6 +36,24 @@ func New(writer io.Writer, level Level) *Logger {
 		level = LevelInformation
 	}
 	return &Logger{writer: writer, level: level}
+}
+
+// AttachFileWriter adds a rotating file writer so log output goes to both
+// the original writer (typically stderr) and the log file.
+func (l *Logger) AttachFileWriter(fw *RotatingFileWriter) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.fileWriter = fw
+}
+
+// CloseFileWriter closes the attached rotating file writer, if any.
+func (l *Logger) CloseFileWriter() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.fileWriter != nil {
+		_ = l.fileWriter.Close()
+		l.fileWriter = nil
+	}
 }
 
 func ParseLevel(value string) Level {
@@ -81,4 +100,7 @@ func (l *Logger) log(level Level, message string) {
 		strings.TrimSpace(message),
 	)
 	_, _ = io.WriteString(l.writer, formatted)
+	if l.fileWriter != nil {
+		_, _ = l.fileWriter.Write([]byte(formatted))
+	}
 }

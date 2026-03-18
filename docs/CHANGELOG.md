@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026.03.18.1559
+
+### Added
+
+- **Remote configuration** — fetch JSON configuration from a remote URL via `--config-url`. Supports `--config-header` and `--config-token` for authenticated endpoints, and `--config-method` to choose between `GET` (default) and `POST`. POST requests send an identity payload containing `hostname`, `nodeId`, `osInfo`, and `ipInfo` so the remote endpoint can return node-specific configuration.
+- **Environment variable fallbacks** — `CONFIG_URL`, `CONFIG_HEADER`, and `CONFIG_TOKEN` environment variables for remote config in containerized deployments.
+- **Log file rotation** — automatic rotating log files named `<binary>.yyyy.mm.dd.log` in the binary's directory. Maximum 3 files at 10 MB each; oldest files are pruned automatically. Logs are written to both stderr and the rotating file.
+
+### Changed
+
+- **Default schedule** — changed from every hour (`0 0 * * * *`) to every 4 hours (`0 0 */4 * * *`) across all defaults, example configs, and documentation.
+
+### Infrastructure
+
+- **`config/remote.go`** — remote config fetcher with `LoadFromURL`, `IdentityPayload`, and lightweight host metadata collection.
+- **`logging/rotation.go`** — `RotatingFileWriter` with date-stamped filenames, size-based rotation, and automatic pruning.
+
+---
+
 ## 2026.03.18.1515
 
 ### Added
