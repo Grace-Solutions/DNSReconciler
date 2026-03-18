@@ -31,7 +31,9 @@ import (
 	"github.com/gracesolutions/dns-automatic-updater/internal/watcher"
 )
 
-const version = "dev"
+// Version is set at build time via -ldflags "-X ...app.Version=yyyy.mm.dd.hhmm".
+// Falls back to "dev" for untagged / local builds.
+var Version = "dev"
 
 type Application struct {
 	logger         *logging.Logger
@@ -74,7 +76,7 @@ func (a Application) Run(args []string) error {
 	case CommandService:
 		return a.handleService(command)
 	case CommandVersion:
-		a.logger.Information(fmt.Sprintf("dnsreconciler version %s (%s/%s)", version, runtime.GOOS, runtime.GOARCH))
+		a.logger.Information(fmt.Sprintf("dnsreconciler version %s (%s/%s)", Version, runtime.GOOS, runtime.GOARCH))
 		return nil
 	default:
 		return fmt.Errorf("unsupported command %q", command.Kind)

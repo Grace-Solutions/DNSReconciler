@@ -9,10 +9,14 @@ WORKDIR /src
 COPY src/go.mod ./
 RUN go mod download
 
+# Version injected at build time (yyyy.mm.dd.hhmm)
+ARG APP_VERSION=dev
+
 # Copy source and build a fully static binary
 COPY src/ ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-s -w" -o /dnsreconciler ./cmd/dnsreconciler
+    go build -ldflags="-s -w -X github.com/gracesolutions/dns-automatic-updater/internal/app.Version=${APP_VERSION}" \
+    -o /dnsreconciler ./cmd/dnsreconciler
 
 # ---- Runtime stage ----
 FROM alpine:3.20

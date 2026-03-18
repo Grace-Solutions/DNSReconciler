@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026.03.18.1706
+
+### Added
+
+- **Centralized versioning** — application version is now injected at build time via `-ldflags` in `yyyy.mm.dd.hhmm` format. Reported by `dnsreconciler version`.
+- **Windows icon embedding** — Windows binaries include an embedded application icon (`dns-00001.ico`) via `goversioninfo` with version metadata in the PE header.
+- **Build script** — `scripts/build.sh` automates cross-compilation for all 5 platforms, generates the Windows `.syso` resource, and updates `versioninfo.json` with the current version.
+- **Dockerfile version injection** — `APP_VERSION` build arg passes the version through to the container binary via ldflags.
+
+---
+
 ## 2026.03.18.1559
 
 ### Added

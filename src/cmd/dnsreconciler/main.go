@@ -1,5 +1,7 @@
 package main
 
+//go:generate goversioninfo -64 -icon=../../../resources/icons/dns-00001.ico -o resource_windows.syso
+
 import (
 	"os"
 

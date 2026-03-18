@@ -749,28 +749,32 @@ All Go commands run from the `src/` directory.
 
 ### Build
 
+The build script handles version injection, Windows icon embedding, and cross-compilation for all platforms:
+
+```bash
+# Build all platforms (version auto-generated as yyyy.mm.dd.hhmm UTC)
+./scripts/build.sh
+
+# Build with explicit version
+./scripts/build.sh 2026.03.18.1700
+```
+
+Binaries are output to `Artifacts/`. The version is injected via `-ldflags` and can be checked with `dnsreconciler version`.
+
+For a single-platform build:
+
 ```bash
 cd src
-
-# Local platform
-go build -o ../Artifacts/dnsreconciler ./cmd/dnsreconciler
-
-# Run tests
-go test ./...
-
-# Cross-compile all targets (static, stripped)
-CGO_ENABLED=0 GOOS=linux   GOARCH=amd64 go build -ldflags="-s -w" -o ../Binaries/dnsreconciler-linux-amd64       ./cmd/dnsreconciler
-CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build -ldflags="-s -w" -o ../Binaries/dnsreconciler-linux-arm64       ./cmd/dnsreconciler
-CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64 go build -ldflags="-s -w" -o ../Binaries/dnsreconciler-darwin-amd64      ./cmd/dnsreconciler
-CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64 go build -ldflags="-s -w" -o ../Binaries/dnsreconciler-darwin-arm64      ./cmd/dnsreconciler
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ../Binaries/dnsreconciler-windows-amd64.exe ./cmd/dnsreconciler
+go build -ldflags="-s -w -X github.com/gracesolutions/dns-automatic-updater/internal/app.Version=$(date -u +'%Y.%m.%d.%H%M')" \
+    -o ../Artifacts/dnsreconciler ./cmd/dnsreconciler
 ```
 
 ### Docker image
 
 ```bash
 cd iac/docker
-docker compose build
+VERSION=$(date -u +"%Y.%m.%d.%H%M")
+docker compose build --build-arg APP_VERSION=$VERSION
 ```
 
 ---

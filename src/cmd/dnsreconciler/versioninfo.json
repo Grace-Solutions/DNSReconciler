@@ -1,0 +1,40 @@
+{
+    "FixedFileInfo": {
+        "FileVersion": {
+            "Major": 2026,
+            "Minor": 3,
+            "Patch": 18,
+            "Build": 1706
+        },
+        "ProductVersion": {
+            "Major": 2026,
+            "Minor": 3,
+            "Patch": 18,
+            "Build": 1706
+        },
+        "FileFlagsMask": "3f",
+        "FileFlags": "",
+        "FileOS": "040004",
+        "FileType": "01",
+        "FileSubType": "00"
+    },
+    "StringFileInfo": {
+        "Comments": "DNS Reconciliation Engine",
+        "CompanyName": "Grace Solutions",
+        "FileDescription": "DNSReconciler - DNS Reconciliation Engine",
+        "FileVersion": "2026.03.18.1706",
+        "InternalName": "dnsreconciler",
+        "LegalCopyright": "Grace Solutions",
+        "OriginalFilename": "dnsreconciler.exe",
+        "ProductName": "DNSReconciler",
+        "ProductVersion": "2026.03.18.1706"
+    },
+    "VarFileInfo": {
+        "Translation": {
+            "LangID": "0409",
+            "CharsetID": "04B0"
+        }
+    },
+    "IconPath": "../../../resources/icons/dns-00001.ico",
+    "ManifestPath": ""
+}
