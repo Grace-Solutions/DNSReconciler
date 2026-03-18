@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Remote config TTL & conditional re-fetching** — in continuous mode, remote configuration is re-fetched when the TTL expires (default: `1h`). Uses `ETag` and `If-Modified-Since` HTTP headers for conditional requests — unchanged configs are served from cache without re-parsing.
+- **`--config-ttl` CLI flag** — override the remote config re-fetch interval via CLI (`-config-ttl 30m`) or `CONFIG_TTL` environment variable.
+- **`settings.runtime.remote` config section** — persistent remote config settings (e.g. `ttl`) in the config file, allowing TTL to be set without CLI flags.
+- **Enhanced identity payload** — POST identity payload now includes `cgnatIPv4` and `interfaceAddresses` (map of interface name → address list) in addition to `rfc1918IPv4`. Virtual bridge interfaces (`docker0`, `br-*`, `veth*`, etc.) are excluded.
+
+---
+
 ## 2026.03.18.1706
 
 ### Added

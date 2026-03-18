@@ -83,19 +83,43 @@ func (a Application) Run(args []string) error {
 	}
 }
 
+// resolveConfigTTL determines the remote config TTL from CLI flag, config file,
+// or the default (1h). CLI flag takes priority over config file.
+func resolveConfigTTL(cliTTL string, cfgRemote *config.RemoteConfig) time.Duration {
+	const defaultTTL = 1 * time.Hour
+
+	// CLI flag takes priority
+	if cliTTL != "" {
+		if d, err := time.ParseDuration(cliTTL); err == nil && d > 0 {
+			return d
+		}
+	}
+	// Config file setting
+	if cfgRemote != nil && cfgRemote.TTL != "" {
+		if d, err := time.ParseDuration(cfgRemote.TTL); err == nil && d > 0 {
+			return d
+		}
+	}
+	return defaultTTL
+}
+
 func (a Application) run(command Command) error {
 	var cfg config.Config
 	var err error
+	var remoteCache *config.RemoteCache
+
+	remoteReq := config.RemoteRequest{
+		URL:    command.ConfigURL,
+		Method: command.ConfigMethod,
+		Header: command.ConfigHeader,
+		Token:  command.ConfigToken,
+	}
 
 	if command.ConfigURL != "" {
 		// Fetch configuration from remote URL
 		a.logger.Information(fmt.Sprintf("Fetching configuration from %s (%s)", command.ConfigURL, command.ConfigMethod))
-		cfg, err = config.LoadFromURL(config.RemoteRequest{
-			URL:    command.ConfigURL,
-			Method: command.ConfigMethod,
-			Header: command.ConfigHeader,
-			Token:  command.ConfigToken,
-		})
+		remoteCache = &config.RemoteCache{}
+		cfg, _, err = config.LoadFromURLCached(remoteReq, remoteCache, 0) // force first fetch
 		if err != nil {
 			return fmt.Errorf("remote config: %w", err)
 		}
@@ -150,6 +174,25 @@ func (a Application) run(command Command) error {
 
 	// reconcileOnce performs a single reconciliation pass (§21.1 steps 5-10).
 	reconcileOnce := func(ctx context.Context) error {
+		// Re-fetch remote config if TTL has expired
+		if remoteCache != nil && command.ConfigURL != "" {
+			ttl := resolveConfigTTL(command.ConfigTTL, cfg.Settings.Runtime.Remote)
+			newCfg, changed, fetchErr := config.LoadFromURLCached(remoteReq, remoteCache, ttl)
+			if fetchErr != nil {
+				a.logger.Warning(fmt.Sprintf("Remote config re-fetch failed (using cached): %s", fetchErr))
+			} else if changed {
+				a.logger.Information("Remote configuration updated — reloading providers")
+				if command.OverrideSchedule != "" {
+					newCfg.Settings.Runtime.Schedule = command.OverrideSchedule
+				}
+				a.logger.SetLevel(logging.ParseLevel(newCfg.Settings.Runtime.LogLevel))
+				rs.mu.Lock()
+				rs.cfg = newCfg
+				rs.providers = a.buildProviderMap(newCfg)
+				rs.mu.Unlock()
+			}
+		}
+
 		rs.mu.RLock()
 		currentCfg := rs.cfg
 		currentProviders := rs.providers

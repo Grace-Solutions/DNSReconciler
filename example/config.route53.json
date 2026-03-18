@@ -6,7 +6,10 @@
             "timezone":          "UTC",
             "cleanupOnShutdown":        true,
             "logLevel":                 "Information",
-            "dryRun":                   false
+            "dryRun":                   false,
+            "remote": {
+                "ttl": "1h"
+            }
         },
         "network": {
             "addressSources": [

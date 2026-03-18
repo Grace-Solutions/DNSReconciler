@@ -29,6 +29,7 @@ type Command struct {
 	ConfigHeader     string // HTTP header name for authentication (e.g. "Authorization")
 	ConfigToken      string // HTTP header value / token
 	ConfigMethod     string // HTTP method: GET (default) or POST
+	ConfigTTL        string // Go duration for remote config re-fetch interval (e.g. "30m", "1h")
 	ServiceAction    service.Action
 	ServiceName      string
 }
@@ -57,6 +58,7 @@ func parseRun(args []string) (Command, error) {
 	configHeader := fs.String("config-header", "", "HTTP header name for remote config authentication (e.g. Authorization).")
 	configToken := fs.String("config-token", "", "HTTP header value / bearer token for remote config.")
 	configMethod := fs.String("config-method", "GET", "HTTP method for remote config fetch (GET or POST).")
+	configTTL := fs.String("config-ttl", "", "Re-fetch interval for remote config (e.g. 30m, 1h). Default: 1h.")
 	if err := fs.Parse(args); err != nil {
 		return Command{}, err
 	}
@@ -86,6 +88,12 @@ func parseRun(args []string) (Command, error) {
 			cfgToken = envVal
 		}
 	}
+	cfgTTL := *configTTL
+	if cfgTTL == "" {
+		if envVal := os.Getenv("CONFIG_TTL"); envVal != "" {
+			cfgTTL = envVal
+		}
+	}
 
 	return Command{
 		Kind:             CommandRun,
@@ -98,6 +106,7 @@ func parseRun(args []string) (Command, error) {
 		ConfigHeader:     cfgHeader,
 		ConfigToken:      cfgToken,
 		ConfigMethod:     *configMethod,
+		ConfigTTL:        cfgTTL,
 	}, nil
 }
 

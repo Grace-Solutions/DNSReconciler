@@ -24,13 +24,19 @@ type SettingsConfig struct {
 
 // RuntimeConfig holds scheduler, state, and logging settings.
 type RuntimeConfig struct {
-	Schedule          string `json:"schedule"`
-	Jitter            string `json:"jitter,omitempty"`
-	Timezone          string `json:"timezone,omitempty"`
-	StatePath         string `json:"statePath"`
-	CleanupOnShutdown bool   `json:"cleanupOnShutdown"`
-	LogLevel          string `json:"logLevel"`
-	DryRun            bool   `json:"dryRun"`
+	Schedule          string        `json:"schedule"`
+	Jitter            string        `json:"jitter,omitempty"`
+	Timezone          string        `json:"timezone,omitempty"`
+	StatePath         string        `json:"statePath"`
+	CleanupOnShutdown bool          `json:"cleanupOnShutdown"`
+	LogLevel          string        `json:"logLevel"`
+	DryRun            bool          `json:"dryRun"`
+	Remote            *RemoteConfig `json:"remote,omitempty"`
+}
+
+// RemoteConfig holds settings for remote (URL-based) configuration fetching.
+type RemoteConfig struct {
+	TTL string `json:"ttl,omitempty"` // Go duration string (e.g. "30m", "1h"). Default: "1h".
 }
 
 // NetworkConfig holds address source configuration.

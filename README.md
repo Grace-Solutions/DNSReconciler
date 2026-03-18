@@ -61,7 +61,7 @@ This makes it ideal for:
 | **Service lifecycle** | Idempotent `install`, `uninstall`, `start`, `stop`, and `init` (install + start) via `sc.exe` (Windows), `systemctl` (Linux), `launchctl` (macOS). |
 | **Centralized logging** | All HTTP requests, provider operations, plan detection, and config reloads are logged with timing and status information. |
 | **Log file rotation** | Automatic rotating log files (`<binary>.yyyy.mm.dd.log`) in the binary's directory. Max 3 files at 10 MB each; oldest pruned automatically. |
-| **Remote configuration** | Fetch config from a URL with `--config-url`. Supports authenticated GET/POST with identity payload for node-specific configuration. |
+| **Remote configuration** | Fetch config from a URL with `--config-url`. Supports authenticated GET/POST with identity payload for node-specific configuration. TTL-based re-fetching with `ETag`/`If-Modified-Since` conditional requests in continuous mode. |
 | **Container service discovery** | Automatic DNS registration for containers on L2-routable networks (IPVLAN/MACVLAN). Queries Docker and Podman Unix sockets directly — no CLI dependency. Label-based hostname expansion via `${LABEL:key}`. |
 | **Docker-native** | Multi-stage Alpine build with `PUID`/`PGID` support and auto-permission entrypoint. |
 | **Credential flexibility** | Direct values, `env:VAR_NAME`, or `file:/path/to/secret`. Secrets are never logged. |
@@ -196,6 +196,7 @@ dnsreconciler [flags]
 | `-config-header <name>` | *(none)* | HTTP header name for remote config authentication (e.g. `Authorization`) |
 | `-config-token <value>` | *(none)* | HTTP header value for remote config authentication |
 | `-config-method <method>` | `GET` | HTTP method for remote config (`GET` or `POST`) |
+| `-config-ttl <duration>` | `1h` | Re-fetch interval for remote config (e.g. `30m`, `1h`). Uses `ETag`/`If-Modified-Since` to avoid re-parsing unchanged content. |
 | `-state <path>` | *(from config)* | Override the state file path |
 | `-node-id <id>` | *(auto-detected)* | Explicit node identity |
 | `-schedule <cron>` | *(from config)* | Override the cron schedule (6-field, seconds enabled) |
@@ -208,11 +209,18 @@ When `-config-method POST` is used, the reconciler sends a JSON identity payload
   "hostname": "web-01",
   "nodeId": "ba9298a1-c5b2-4431-b3a4-7f0347e971b5",
   "osInfo": { "os": "linux", "architecture": "amd64" },
-  "ipInfo": { "rfc1918IPv4": "192.168.1.10" }
+  "ipInfo": {
+    "rfc1918IPv4": "192.168.1.10",
+    "cgnatIPv4": "",
+    "interfaceAddresses": {
+      "eth0": ["192.168.1.10", "fe80::1"],
+      "ens192": ["10.0.0.5"]
+    }
+  }
 }
 ```
 
-The remote endpoint can use this information to return node-specific configuration.
+The remote endpoint can use this information to return node-specific configuration. Virtual bridge interfaces (`docker0`, `br-*`, `veth*`, etc.) are automatically excluded from the interface address list.
 
 **Environment variable overrides:**
 
@@ -222,6 +230,7 @@ The remote endpoint can use this information to return node-specific configurati
 | `CONFIG_URL` | `-config-url` |
 | `CONFIG_HEADER` | `-config-header` |
 | `CONFIG_TOKEN` | `-config-token` |
+| `CONFIG_TTL` | `-config-ttl` |
 
 Priority: CLI flag > environment variable > config file.
 
@@ -344,6 +353,13 @@ All credential fields support three syntaxes:
 | `cleanupOnShutdown` | `bool` | `false` | Delete all owned records on graceful shutdown |
 | `logLevel` | `string` | `Information` | One of: `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical` |
 | `dryRun` | `bool` | `false` | Log planned changes without applying them |
+| `remote` | `object` | *(none)* | Remote config caching settings (see below) |
+
+#### `settings.runtime.remote`
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `ttl` | `string` | `1h` | Go duration (e.g. `30m`, `1h`, `4h`). How often to re-fetch remote config. Uses `ETag`/`If-Modified-Since` headers for conditional requests. |
 
 #### `settings.network.addressSources`
 
