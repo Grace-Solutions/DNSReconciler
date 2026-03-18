@@ -20,17 +20,16 @@ PGID="${PGID:-911}"
 USERNAME="dnsreconciler"
 GROUPNAME="dnsreconciler"
 
-# ---- Reconcile group ----
+# ---- Reconcile user/group ----
+# Delete user first (so the group has no members), then group,
+# then recreate both with the requested IDs.
+CURRENT_UID="$(id -u "${USERNAME}" 2>/dev/null || echo "")"
 CURRENT_GID="$(id -g "${USERNAME}" 2>/dev/null || echo "")"
-if [ "${CURRENT_GID}" != "${PGID}" ]; then
+
+if [ "${CURRENT_UID}" != "${PUID}" ] || [ "${CURRENT_GID}" != "${PGID}" ]; then
+    deluser "${USERNAME}" 2>/dev/null || true
     delgroup "${GROUPNAME}" 2>/dev/null || true
     addgroup -g "${PGID}" -S "${GROUPNAME}"
-fi
-
-# ---- Reconcile user ----
-CURRENT_UID="$(id -u "${USERNAME}" 2>/dev/null || echo "")"
-if [ "${CURRENT_UID}" != "${PUID}" ]; then
-    deluser "${USERNAME}" 2>/dev/null || true
     adduser -u "${PUID}" -G "${GROUPNAME}" -S -H -D "${USERNAME}"
 fi
 
